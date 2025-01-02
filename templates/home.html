@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Home
+{% endblock %}
+
+{% block content %}
+<h2>Welcome to Our Store</h2>
+{% if session.get('user_id') %}
+    <p>Welcome, {{ session['user_name'] }}!</p>
+    <p><a href="{{ url_for('products') }}" class="btn btn-primary">View Products</a></p>
+{% else %}
+    <p>Welcome to our store! Please <a href="{{ url_for('login') }}">log in</a> or <a href="{{ url_for('register') }}">register</a> to explore our products.</p>
+{% endif %}
+{% endblock %}

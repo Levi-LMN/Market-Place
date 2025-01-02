@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Login
+{% endblock %}
+
+{% block content %}
+<h2>Login</h2>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div>
+        <label for="email">Email</label>
+        {{ form.email(class="form-control") }}
+    </div>
+    <div>
+        <label for="password">Password</label>
+        <div style="position: relative;">
+            {{ form.password(class="form-control", id="password") }}
+            <button type="button" id="togglePassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+                Show
+            </button>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Login</button>
+</form>
+<p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
+
+<script>
+    document.getElementById('togglePassword').addEventListener('click', function () {
+        const passwordField = document.getElementById('password');
+        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordField.setAttribute('type', type);
+
+        // Change the button text
+        this.textContent = type === 'password' ? 'Show' : 'Hide';
+    });
+</script>
+{% endblock %}

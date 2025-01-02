@@ -1,0 +1,58 @@
+<!-- templates/order_confirmation.html -->
+{% extends "base.html" %}
+
+{% block title %}Order Confirmation{% endblock %}
+
+{% block content %}
+<main>
+    <section>
+        <h2>Thank you for your order!</h2>
+        <p>Your order has been successfully placed. Below are the details of your order.</p>
+    </section>
+
+    <section>
+        <h3>Order Details</h3>
+        <p><strong>Order ID:</strong> {{ order.id }}</p>
+        <p><strong>Total Price:</strong> ${{ order.total_price }}</p>
+        <p><strong>Status:</strong> {{ order.status }}</p>
+        <p><strong>Order Date:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+    </section>
+
+    <section>
+        <h3>Order Items</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.order_items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>${{ item.price_at_time }}</td>
+                    <td>${{ item.quantity * item.price_at_time }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h3>Payment Information</h3>
+        <p><strong>Payment Method:</strong> {{ order.payment.payment_method }}</p>
+        <p><strong>Payment Status:</strong> {{ order.payment.payment_status }}</p>
+        {% if order.payment.mpesa_transaction_id %}
+        <p><strong>MPESA Transaction ID:</strong> {{ order.payment.mpesa_transaction_id }}</p>
+        {% endif %}
+    </section>
+
+    <section>
+        <a href="{{ url_for('products') }}" class="button">Continue Shopping</a>
+    </section>
+</main>
+{% endblock %}

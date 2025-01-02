@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}
+{{ product.name }}
+{% endblock %}
+
+{% block content %}
+<h2>{{ product.name }}</h2>
+<p>{{ product.description }}</p>
+<p>Price: ${{ product.price }}</p>
+<p>Stock Quantity: {{ product.stock_quantity }}</p>
+
+<!-- Display all product images -->
+<div>
+   {% if product.images %}
+       {% for image in product.images %}
+           <img src="{{ url_for('static', filename='uploads/' + image.image_url) }}"
+                alt="Image of {{ product.name }}"
+                style="width: 300px; height: auto;">
+       {% endfor %}
+   {% else %}
+       <p>No image available for this product.</p>
+   {% endif %}
+</div>
+
+<h3>Order Quantity</h3>
+<form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}">
+   {% if existing_order_item %}
+       <p>Already in cart: {{ existing_order_item.quantity }}</p>
+   {% endif %}
+   <input type="number" name="quantity" value="1" min="1" max="{{ product.stock_quantity }}" required>
+   <button type="submit" class="btn btn-primary">
+       {% if existing_order_item %}Update Cart{% else %}Add to Cart{% endif %}
+   </button>
+</form>
+
+<p><a href="{{ url_for('products') }}" class="btn btn-secondary">Back to Products</a></p>
+{% endblock %}

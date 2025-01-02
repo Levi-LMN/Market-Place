@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Reflections</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        html {
+            font-size: 16px;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #fff;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background 0.5s ease;
+        }
+        .container {
+            width: 90%;
+            max-width: 700px;
+            margin: 1rem;
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+        #paragraph {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 1s, transform 1s;
+        }
+        .fade-in {
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
+        .fade-out {
+            opacity: 0 !important;
+            transform: translateY(-20px) !important;
+        }
+        .controls {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.6);
+        }
+        button:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            cursor: not-allowed;
+        }
+        #endMessage {
+            margin-top: 1rem;
+            font-size: 1.2rem;
+            color: #fdd835;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .visible {
+            opacity: 1 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="title">Daily Reflection</h1>
+        <div id="paragraph">
+            <!-- Animated paragraph content -->
+        </div>
+        <div class="controls">
+            <button id="prevBtn" disabled>&#10094; Previous</button>
+            <button id="playPauseBtn">Pause</button>
+            <button id="nextBtn">Next &#10095;</button>
+        </div>
+        <div id="endMessage">You have reached the end of today’s story.</div>
+    </div>
+
+    <script>
+        const stories = [
+            {
+                title: "The Miracle of the Holy Fire",
+                paragraphs: [
+                    "Each year in Jerusalem, thousands gather to witness a phenomenon that has persisted for centuries: the Holy Fire at the Church of the Holy Sepulchre.",
+                    "This miraculous flame is said to descend into the tomb of Jesus, igniting candles without human intervention.",
+                    "Pilgrims describe it as a moment of divine connection, as the light spreads through the congregation.",
+                    "The Holy Fire reminds believers of the Resurrection, a light that dispels darkness and renews hope in the hearts of those who witness it."
+                ],
+                theme: "linear-gradient(135deg, #ff9966, #ff5e62)"
+            },
+            {
+                title: "The Conversion of Clovis I",
+                paragraphs: [
+                    "Clovis, a young king of the Franks, found himself on the brink of defeat in a crucial battle.",
+                    "His wife, Queen Clotilde, a devout Christian, had long urged him to trust in the Christian God.",
+                    "Desperate, Clovis called upon the God of his wife, vowing to convert if granted victory.",
+                    "Miraculously, the tide turned, and Clovis emerged victorious. His conversion marked the beginning of a Christian kingdom, shaping the history of Europe forever."
+                ],
+                theme: "linear-gradient(135deg, #56ab2f, #a8e063)"
+            },
+            {
+                title: "The Parable of the Three Trees",
+                paragraphs: [
+                    "Three young trees on a hillside dreamed of their future: one wished to hold great treasures, another hoped to carry kings, and the third aspired to point people to God.",
+                    "Years passed, and their dreams seemed shattered as they were cut down for ordinary purposes.",
+                    "The first became a manger, holding the Christ child. The second became a fishing boat, carrying Jesus during His ministry.",
+                    "The third was shaped into a cross, fulfilling its ultimate purpose as a beacon of salvation for the world."
+                ],
+                theme: "linear-gradient(135deg, #ff7e5f, #feb47b)"
+            }
+        ];
+
+        const titleElement = document.getElementById("title");
+        const paragraphElement = document.getElementById("paragraph");
+        const prevBtn = document.getElementById("prevBtn");
+        const playPauseBtn = document.getElementById("playPauseBtn");
+        const nextBtn = document.getElementById("nextBtn");
+        const endMessage = document.getElementById("endMessage");
+
+        const today = new Date().getDate();
+        const storyIndex = today % stories.length;
+        const story = stories[storyIndex];
+        let paragraphIndex = 0;
+        let isPlaying = true;
+        let interval;
+
+        // Set initial title and theme
+        titleElement.textContent = story.title;
+        document.body.style.background = story.theme;
+
+        function showParagraph(index) {
+            if (index >= 0 && index < story.paragraphs.length) {
+                paragraphElement.textContent = story.paragraphs[index];
+                paragraphElement.classList.add("fade-in");
+                setTimeout(() => paragraphElement.classList.remove("fade-in"), 1000);
+            }
+        }
+
+        function updateButtons() {
+            prevBtn.disabled = paragraphIndex === 0;
+            nextBtn.disabled = paragraphIndex === story.paragraphs.length;
+            endMessage.classList.toggle("visible", paragraphIndex === story.paragraphs.length);
+        }
+
+        function playStory() {
+            if (paragraphIndex < story.paragraphs.length) {
+                showParagraph(paragraphIndex);
+                paragraphIndex++;
+                updateButtons();
+            } else {
+                clearInterval(interval);
+            }
+        }
+
+        function togglePlayPause() {
+            isPlaying = !isPlaying;
+            playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
+            if (isPlaying) {
+                interval = setInterval(playStory, 5000);
+            } else {
+                clearInterval(interval);
+            }
+        }
+
+        prevBtn.addEventListener("click", () => {
+            if (paragraphIndex > 0) {
+                paragraphIndex--;
+                showParagraph(paragraphIndex);
+                updateButtons();
+            }
+        });
+
+        nextBtn.addEventListener("click", () => {
+            if (paragraphIndex < story.paragraphs.length) {
+                showParagraph(paragraphIndex);
+                paragraphIndex++;
+                updateButtons();
+            }
+        });
+
+        playPauseBtn.addEventListener("click", togglePlayPause);
+
+        // Start story
+        showParagraph(paragraphIndex);
+        paragraphIndex++;
+        updateButtons();
+        interval = setInterval(playStory, 5000);
+    </script>
+</body>
+</html>

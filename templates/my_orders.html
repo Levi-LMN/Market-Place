@@ -1,0 +1,41 @@
+<!-- templates/my_orders.html -->
+{% extends "base.html" %}
+
+{% block title %}My Orders{% endblock %}
+
+{% block content %}
+<main>
+    <section>
+        <h2>My Orders</h2>
+        {% if orders %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Date</th>
+                    <th>Total Price</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.id }}</td>
+                    <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>${{ order.total_price }}</td>
+                    <td>{{ order.status }}</td>
+                    <td>
+                        <a href="{{ url_for('order_confirmation', order_id=order.id) }}" class="button">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>You have no orders yet. Start shopping now!</p>
+        <a href="{{ url_for('products') }}" class="button">Browse Products</a>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}
