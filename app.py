@@ -8,6 +8,23 @@ from sqlalchemy.exc import IntegrityError
 from flask_wtf.file import FileField, FileAllowed
 from werkzeug.utils import secure_filename
 import os
+from flask import g
+from functools import wraps
+from requests.auth import HTTPBasicAuth
+import requests
+import base64
+from datetime import datetime
+import json
+from flask import Flask, jsonify, request
+# Add these imports at the top of your app.py
+import os
+from urllib.parse import urljoin
+
+
+
+
+
+
 
 UPLOAD_FOLDER = 'static/uploads'
 app = Flask(__name__)
@@ -16,6 +33,9 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///store.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_ENABLED'] = True
+# Add this configuration after your other app configs
+NGROK_URL = None  # This will be updated when you start your application
+
 db = SQLAlchemy(app)
 
 
@@ -83,7 +103,8 @@ class Payment(db.Model):
     payment_method = db.Column(db.String(50), nullable=False, default="MPESA")
     payment_status = db.Column(db.String(50), nullable=False)
     mpesa_transaction_id = db.Column(db.String(100), nullable=True)
-
+    checkout_request_id = db.Column(db.String(100), nullable=True)
+    phone_number = db.Column(db.String(15), nullable=True)
 
 # Forms
 class RegistrationForm(FlaskForm):
@@ -115,6 +136,84 @@ class ProductForm(FlaskForm):
     stock_quantity = StringField('Stock Quantity', validators=[DataRequired()])
     images = FileField('Images', validators=[FileAllowed(['jpg', 'png', 'jpeg'])])
     submit = SubmitField('Submit')
+
+
+from flask import Flask, jsonify, request
+import requests
+from requests.auth import HTTPBasicAuth
+import base64
+from datetime import datetime
+import json
+
+
+class MpesaC2bCredential:
+    consumer_key = 'vbxsneeZ9IMFoyKKIgOIQQZFlawAADnP'
+    consumer_secret = 'WAzDhQVhitIXwiTc'
+    api_URL = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+
+
+class MpesaAccessToken:
+    @staticmethod
+    def validated_mpesa_access_token():
+        try:
+            consumer_key = MpesaC2bCredential.consumer_key
+            consumer_secret = MpesaC2bCredential.consumer_secret
+            api_URL = MpesaC2bCredential.api_URL
+
+            r = requests.get(api_URL, auth=HTTPBasicAuth(consumer_key, consumer_secret))
+            r.raise_for_status()  # Raise an exception for bad status codes
+            mpesa_access_token = json.loads(r.text)
+            return mpesa_access_token['access_token']
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting access token: {str(e)}")
+            raise Exception("Failed to get M-Pesa access token")
+
+
+class LipaNaMpesaOnline:
+    def __init__(self):
+        self.timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        self.business_shortcode = "174379"
+        self.passkey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'
+
+    def encode_password(self):
+        data_to_encode = self.business_shortcode + self.passkey + self.timestamp
+        return base64.b64encode(data_to_encode.encode()).decode('utf-8')
+
+    def initiate_stk_push(self, phone_number, amount, callback_url):
+        try:
+            access_token = MpesaAccessToken.validated_mpesa_access_token()
+            api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+
+            payload = {
+                "BusinessShortCode": self.business_shortcode,
+                "Password": self.encode_password(),
+                "Timestamp": self.timestamp,
+                "TransactionType": "CustomerPayBillOnline",
+                "Amount": int(amount),  # Ensure amount is an integer
+                "PartyA": int(phone_number),  # Convert phone number to integer
+                "PartyB": self.business_shortcode,
+                "PhoneNumber": int(phone_number),  # Convert phone number to integer
+                "CallBackURL": callback_url,
+                "AccountReference": "LevisStore",
+                "TransactionDesc": "Payment for order"
+            }
+
+            response = requests.post(api_url, json=payload, headers=headers)
+            response.raise_for_status()  # Raise an exception for bad status codes
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error in STK push: {str(e)}")
+            if hasattr(e.response, 'text'):
+                print(f"M-Pesa API response: {e.response.text}")
+            raise Exception("Failed to initiate M-Pesa payment")
+
+
 
 
 # Admin Required Decorator
@@ -195,7 +294,14 @@ def products():
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    return render_template('product_detail.html', product=product)
+
+    existing_order_item = None
+    if 'user_id' in session:
+        order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+        if order:
+            existing_order_item = OrderItem.query.filter_by(order_id=order.id, product_id=product_id).first()
+
+    return render_template('product_detail.html', product=product, existing_order_item=existing_order_item)
 
 
 @app.route('/admin/add_product', methods=['GET', 'POST'])
@@ -396,37 +502,6 @@ def remove_from_cart(order_item_id):
     return redirect(url_for('view_cart'))
 
 
-@app.route('/checkout', methods=['POST'])
-def checkout():
-    if 'user_id' not in session:
-        flash('Please login to checkout.', 'warning')
-        return redirect(url_for('login'))
-
-    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
-    if not order:
-        flash('Your cart is empty.', 'info')
-        return redirect(url_for('view_cart'))
-
-    # Create payment record
-    payment = Payment(
-        order_id=order.id,
-        payment_method="MPESA",
-        payment_status="Pending"
-    )
-    db.session.add(payment)
-
-    # Update order status
-    order.status = "Processing"
-
-    try:
-        db.session.commit()
-        flash('Order placed successfully!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash('Error processing order.', 'danger')
-        print(f"Database error: {e}")
-
-    return redirect(url_for('order_confirmation', order_id=order.id))
 
 
 @app.route('/order_confirmation/<int:order_id>')
@@ -451,12 +526,6 @@ def manage_users():
     users = User.query.all()
     return render_template('manage_users.html', users=users)
 
-
-@app.route('/admin/manage_orders')
-@admin_required
-def manage_orders():
-    orders = Order.query.all()
-    return render_template('manage_orders.html', orders=orders)
 
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
@@ -496,6 +565,385 @@ def my_orders():
     return render_template('my_orders.html', orders=user_orders)
 
 
+# Add to your existing imports
+from datetime import datetime
+
+
+# Add new route before the checkout route
+@app.route('/checkout_page')
+def checkout_page():
+    if 'user_id' not in session:
+        flash('Please login to checkout.', 'warning')
+        return redirect(url_for('login'))
+
+    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+    if not order:
+        flash('Your cart is empty.', 'info')
+        return redirect(url_for('view_cart'))
+
+    return render_template('checkout.html', order=order)
+
+
+# Modify existing checkout route
+@app.route('/checkout', methods=['POST'])
+def checkout():
+    if 'user_id' not in session:
+        flash('Please login to checkout.', 'warning')
+        return redirect(url_for('login'))
+
+    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+    if not order:
+        flash('Your cart is empty.', 'info')
+        return redirect(url_for('view_cart'))
+
+    mpesa_transaction_id = request.form.get('mpesa_transaction_id')
+
+    if not mpesa_transaction_id:
+        flash('Please provide MPESA transaction ID.', 'danger')
+        return redirect(url_for('checkout_page'))
+
+    payment = Payment(
+        order_id=order.id,
+        payment_method="MPESA",
+        payment_status="Completed",
+        mpesa_transaction_id=mpesa_transaction_id
+    )
+    db.session.add(payment)
+    order.status = "Processing"
+
+    try:
+        db.session.commit()
+        flash('Order placed successfully!', 'success')
+        return redirect(url_for('order_confirmation', order_id=order.id))
+    except Exception as e:
+        db.session.rollback()
+        flash('Error processing order.', 'danger')
+        return redirect(url_for('checkout_page'))
+
+# Add to routes
+
+@app.route('/admin/manage_orders', methods=['GET'])
+@admin_required
+def manage_orders():
+    # Get filter parameters
+    status = request.args.get('status')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    # Build query
+    query = Order.query
+
+    # Apply filters
+    if status:
+        query = query.filter(Order.status == status)
+    if start_date:
+        query = query.filter(Order.created_at >= datetime.strptime(start_date, '%Y-%m-%d'))
+    if end_date:
+        query = query.filter(Order.created_at <= datetime.strptime(end_date, '%Y-%m-%d'))
+
+    # Fetch filtered orders
+    orders = query.order_by(Order.created_at.desc()).all()
+
+    return render_template('manage_orders.html', orders=orders)
+
+
+
+@app.route('/admin/update_order_status/<int:order_id>', methods=['POST'])
+@admin_required
+def update_order_status(order_id):
+    order = Order.query.get_or_404(order_id)
+    new_status = request.form.get('status')
+    if new_status in ['Processing', 'Shipped', 'Delivered', 'Cancelled']:
+        order.status = new_status
+        db.session.commit()
+        flash('Order status updated successfully!', 'success')
+    return redirect(url_for('manage_orders'))
+
+def get_cart_unique_items():
+    if 'user_id' in session:
+        order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+        if order:
+            return OrderItem.query.filter_by(order_id=order.id).count()
+    return 0
+
+@app.context_processor
+def inject_cart_count():
+    return dict(cart_count=get_cart_unique_items())
+
+
+
+def check_mpesa_status(checkout_request_id):
+    """Check the status of an M-Pesa transaction"""
+    try:
+        access_token = MpesaAccessToken.validated_mpesa_access_token()
+        api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query"
+
+        mpesa = LipaNaMpesaOnline()
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "BusinessShortCode": mpesa.business_shortcode,
+            "Password": mpesa.encode_password(),
+            "Timestamp": mpesa.timestamp,
+            "CheckoutRequestID": checkout_request_id
+        }
+
+        response = requests.post(api_url, json=payload, headers=headers)
+        return response.json()
+
+    except Exception as e:
+        print(f"Error querying M-Pesa status: {str(e)}")
+        return {"ResultCode": -1, "ResultDesc": "Error querying status"}
+
+
+@app.route('/mpesa_callback', methods=['POST'])
+def mpesa_callback():
+    try:
+        callback_data = request.get_json()
+        print("M-Pesa Callback Data:", callback_data)  # Debug log
+
+        # Extract the STK callback data
+        stk_callback = callback_data.get('Body', {}).get('stkCallback', {})
+        checkout_request_id = stk_callback.get('CheckoutRequestID')
+        result_code = stk_callback.get('ResultCode')
+
+        # Find the payment record
+        payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
+        if not payment:
+            print(f"Payment not found for CheckoutRequestID: {checkout_request_id}")
+            return jsonify({'error': 'Payment not found'}), 404
+
+        # Handle successful payment
+        if result_code == 0:
+            try:
+                # Extract payment details from callback metadata
+                callback_metadata = stk_callback.get('CallbackMetadata', {}).get('Item', [])
+                mpesa_receipt_number = None
+                amount = None
+                transaction_date = None
+                phone_number = None
+
+                # Extract specific fields from metadata
+                for item in callback_metadata:
+                    if item.get('Name') == 'MpesaReceiptNumber':
+                        mpesa_receipt_number = str(item.get('Value'))
+                    elif item.get('Name') == 'Amount':
+                        amount = item.get('Value')
+                    elif item.get('Name') == 'TransactionDate':
+                        transaction_date = str(item.get('Value'))
+                    elif item.get('Name') == 'PhoneNumber':
+                        phone_number = str(item.get('Value'))
+
+                print(f"Extracted M-Pesa Receipt Number: {mpesa_receipt_number}")  # Debug log
+
+                if mpesa_receipt_number:
+                    # Update payment record with transaction details
+                    payment.payment_status = "Completed"
+                    payment.mpesa_transaction_id = mpesa_receipt_number
+
+                    # Update order status
+                    order = Order.query.get(payment.order_id)
+                    if order:
+                        order.status = "Processing"
+
+                    # Commit the transaction
+                    db.session.commit()
+                    print(f"Payment completed successfully. Order ID: {payment.order_id}, "
+                          f"Transaction ID: {payment.mpesa_transaction_id}")
+                else:
+                    print("Warning: No M-Pesa receipt number found in callback data")
+
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error updating payment record: {str(e)}")
+                raise
+
+        # Handle failed payment
+        elif result_code not in [None, "", "Pending"]:
+            payment.payment_status = "Failed"
+            db.session.commit()
+            print(f"Payment failed with ResultCode: {result_code}")
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        print(f"Error processing M-Pesa callback: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/check_payment_status/<checkout_request_id>')
+def check_payment_status(checkout_request_id):
+    try:
+        # Find payment record
+        payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
+        if not payment:
+            return jsonify({
+                'status': 'Failed',
+                'message': 'Payment not found'
+            }), 404
+
+        # If payment is already completed
+        if payment.payment_status == "Completed" and payment.mpesa_transaction_id:
+            try:
+                # Ensure order status is updated
+                order = Order.query.get(payment.order_id)
+                if order and order.status == "Pending":
+                    order.status = "Processing"
+                    db.session.commit()
+
+                return jsonify({
+                    'status': 'Completed',
+                    'order_id': payment.order_id,
+                    'transaction_id': payment.mpesa_transaction_id
+                })
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error updating order status: {str(e)}")
+                raise
+
+        elif payment.payment_status == "Failed":
+            return jsonify({
+                'status': 'Failed',
+                'message': 'Payment failed. Please try again.'
+            })
+
+        # Check M-Pesa status for pending payments
+        mpesa_status = check_mpesa_status(checkout_request_id)
+        if not mpesa_status:
+            return jsonify({
+                'status': 'Pending',
+                'message': 'Payment is being processed'
+            })
+
+        result_code = mpesa_status.get('ResultCode')
+        if isinstance(result_code, str):
+            try:
+                result_code = int(result_code)
+            except (ValueError, TypeError):
+                result_code = None
+
+        # Process M-Pesa status response
+        if result_code == 0:
+            # Extract transaction ID from status check if available
+            transaction_id = mpesa_status.get('MpesaReceiptNumber')
+            try:
+                payment.payment_status = "Completed"
+                if transaction_id:
+                    payment.mpesa_transaction_id = transaction_id
+
+                order = Order.query.get(payment.order_id)
+                if order:
+                    order.status = "Processing"
+                db.session.commit()
+
+                return jsonify({
+                    'status': 'Completed',
+                    'order_id': payment.order_id,
+                    'transaction_id': payment.mpesa_transaction_id
+                })
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error updating payment status: {str(e)}")
+                raise
+
+        elif result_code is not None:
+            payment.payment_status = "Failed"
+            db.session.commit()
+            return jsonify({
+                'status': 'Failed',
+                'message': 'Payment failed. Please try again.'
+            })
+
+        return jsonify({
+            'status': 'Pending',
+            'message': 'Payment is being processed'
+        })
+
+    except Exception as e:
+        print(f"Error checking payment status: {str(e)}")
+        return jsonify({
+            'status': 'Pending',
+            'message': 'Payment status check is temporarily unavailable'
+        })
+
+# Modify your initiate_payment route
+@app.route('/initiate_payment', methods=['POST'])
+def initiate_payment():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'error': 'Please login to checkout'}), 401
+
+        if not NGROK_URL:
+            return jsonify({'error': 'Callback URL not configured. Please ensure ngrok is running.'}), 500
+
+        phone_number = request.form.get('phone_number')
+        if not phone_number:
+            return jsonify({'error': 'Phone number is required'}), 400
+
+        # Clean and format phone number
+        phone_number = phone_number.strip()
+        if phone_number.startswith('+'):
+            phone_number = phone_number[1:]
+        elif phone_number.startswith('0'):
+            phone_number = '254' + phone_number[1:]
+        elif not phone_number.startswith('254'):
+            phone_number = '254' + phone_number
+
+        # Validate phone number format
+        if not phone_number.isdigit() or len(phone_number) != 12:
+            return jsonify({'error': 'Invalid phone number format'}), 400
+
+        order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+        if not order:
+            return jsonify({'error': 'No pending order found'}), 404
+
+        amount = int(order.total_price)
+
+        # Create payment record
+        payment = Payment(
+            order_id=order.id,
+            payment_method="MPESA",
+            payment_status="Pending",
+            phone_number=phone_number
+        )
+        db.session.add(payment)
+        db.session.commit()
+
+        # Initialize STK Push with ngrok callback URL
+        mpesa = LipaNaMpesaOnline()
+        callback_url = urljoin(NGROK_URL, '/mpesa_callback')
+        print(f"Callback URL: {callback_url}")  # For debugging
+
+        response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
+
+        if 'CheckoutRequestID' in response:
+            payment.checkout_request_id = response['CheckoutRequestID']
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Payment initiated. Please check your phone to complete payment.',
+                'checkout_request_id': response['CheckoutRequestID']
+            })
+
+        return jsonify({
+            'success': False,
+            'message': 'Failed to initiate payment. Please try again.'
+        }), 500
+
+    except Exception as e:
+        print(f"Payment initiation error: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to initiate payment: {str(e)}'
+        }), 500
+
+
+# Add this at the bottom of your file, just before app.run()
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -505,5 +953,20 @@ if __name__ == '__main__':
         if not Role.query.filter_by(name='customer').first():
             db.session.add(Role(name='customer'))
         db.session.commit()
+
+    # Check if ngrok is running and get the public URL
+    try:
+        ngrok_api_response = requests.get('http://localhost:4040/api/tunnels')
+        tunnels = ngrok_api_response.json()['tunnels']
+        NGROK_URL = [t['public_url'] for t in tunnels if t['public_url'].startswith('https')][0]
+        print(f"\nNgrok tunnel established at: {NGROK_URL}")
+    except Exception as e:
+        print("\nError: Ngrok is not running. Please start ngrok first.")
+        print("Follow these steps to set up ngrok:")
+        print("1. Download ngrok from https://ngrok.com/download")
+        print("2. Extract the downloaded file")
+        print("3. Open a new terminal and navigate to the ngrok folder")
+        print("4. Run: ngrok http 5000")
+        sys.exit(1)
 
     app.run(debug=True)
