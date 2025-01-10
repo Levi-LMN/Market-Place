@@ -1,51 +1,187 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Missing Poster</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f4f4f4;
-            font-family: Arial, sans-serif;
-        }
-        .poster {
-            text-align: center;
-            background: white;
-            border: 1px solid #ccc;
-            padding: 20px;
-            width: 300px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .poster h1 {
-            font-size: 24px;
-            margin: 0;
-            font-weight: bold;
-        }
-        .poster img {
-            margin: 20px 0;
-            width: 100%;
-            height: auto;
-            border: 1px solid #ccc;
-        }
-        .poster p {
-            font-size: 18px;
-            margin: 0;
-            color: #333;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Missing Poster</title>
+  <style>
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(90deg, #1e3c72, #2a5298);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #ffffff;
+    }
+
+    .poster {
+      background: #ffffff;
+      color: #333;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      padding: 30px;
+      text-align: center;
+      overflow: hidden;
+      animation: pulse 1.5s infinite;
+    }
+
+    .poster h1 {
+      font-size: 3rem;
+      color: #ff4b5c;
+      margin: 0;
+    }
+
+    .poster .subtitle {
+      font-size: 1.2rem;
+      color: #555;
+      margin: 10px 0 20px;
+      font-style: italic;
+    }
+
+    .photo-frame {
+      border-radius: 20px;
+      overflow: hidden;
+      margin: 20px auto;
+      width: 300px;
+      height: 300px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .photo-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+
+    .photo-frame img:hover {
+      transform: scale(1.1);
+    }
+
+    .details p {
+      font-size: 1.1rem;
+      margin: 20px 0;
+      line-height: 1.6;
+    }
+
+    .characteristics {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .characteristics li {
+      list-style: none;
+      background: #ff4b5c;
+      color: #ffffff;
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-size: 1rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .reward {
+      background: linear-gradient(90deg, #ff9a9e, #fecfef);
+      padding: 20px;
+      border-radius: 15px;
+      color: #333;
+      margin: 20px 0;
+      text-align: center;
+    }
+
+    .reward p {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .contact {
+      background: #f7f7f7;
+      color: #333;
+      padding: 20px;
+      border-radius: 15px;
+      margin: 20px 0;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .contact p {
+      margin: 5px 0;
+      font-size: 1rem;
+    }
+
+    .urgency {
+      font-size: 1rem;
+      color: #ff4b5c;
+      margin-top: 20px;
+      font-style: italic;
+    }
+
+    @media (max-width: 768px) {
+      .poster {
+        padding: 20px;
+      }
+
+      .poster h1 {
+        font-size: 2rem;
+      }
+
+      .photo-frame {
+        width: 250px;
+        height: 250px;
+      }
+
+      .characteristics li {
+        font-size: 0.9rem;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="poster">
-        <h1>MISSING</h1>
-        <img src="levi.png" alt="Missing Person">
-        <p>you so much</p>
+  <div class="poster">
+    <h1>MISSING</h1>
+    <p class="subtitle">Last seen stealing my heart</p>
+
+    <div class="photo-frame">
+      <img src="/api/placeholder/300/300" alt="Placeholder">
     </div>
+
+    <div class="details">
+      <p>YOU... <br>
+      More than words can express <br>
+      Every single moment of every day</p>
+    </div>
+
+    <ul class="characteristics">
+      <li>✨ Incredibly Adorable</li>
+      <li>💫 Perfectly Perfect</li>
+      <li>💝 Heart Stealer</li>
+      <li>✨ Smile Maker</li>
+    </ul>
+
+    <div class="reward">
+      <p><strong>♥ REWARD ♥</strong></p>
+      <p>Endless love, countless kisses, and forever hugs</p>
+    </div>
+
+    <div class="contact">
+      <p><strong>If found, please return to:</strong></p>
+      <p>The one who can't stop thinking about you</p>
+      <p>Contact: My Heart ♥</p>
+    </div>
+
+    <p class="urgency">Missing you is an ongoing emergency that only you can resolve</p>
+  </div>
 </body>
 </html>

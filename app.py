@@ -19,10 +19,7 @@ from flask import Flask, jsonify, request
 # Add these imports at the top of your app.py
 import os
 from urllib.parse import urljoin
-
-
-
-
+import sys
 
 
 
@@ -76,6 +73,7 @@ class Product(db.Model):
     images = db.relationship('ProductImage', backref='product', lazy=True)
 
 
+# Update the Order model relationship with Payment
 class Order(db.Model):
     __tablename__ = 'orders'
     id = db.Column(db.Integer, primary_key=True)
@@ -84,7 +82,8 @@ class Order(db.Model):
     status = db.Column(db.String(50), nullable=False, default='Pending')
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
     order_items = db.relationship('OrderItem', backref='order', lazy=True)
-    payment = db.relationship('Payment', backref='order', uselist=False)
+    # Modified relationship to ensure one-to-one
+    payment = db.relationship('Payment', backref='order', uselist=False, cascade="all, delete-orphan")
 
 
 class OrderItem(db.Model):
@@ -99,12 +98,14 @@ class OrderItem(db.Model):
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False, unique=True)  # Added unique constraint
     payment_method = db.Column(db.String(50), nullable=False, default="MPESA")
     payment_status = db.Column(db.String(50), nullable=False)
-    mpesa_transaction_id = db.Column(db.String(100), nullable=True)
-    checkout_request_id = db.Column(db.String(100), nullable=True)
+    mpesa_transaction_id = db.Column(db.String(100), nullable=True, unique=True)  # Added unique constraint
+    checkout_request_id = db.Column(db.String(100), nullable=True, unique=True)  # Added unique constraint
     phone_number = db.Column(db.String(15), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())  # Added timestamp
+    updated_at = db.Column(db.DateTime, onupdate=db.func.current_timestamp())  # Added update timestamp
 
 # Forms
 class RegistrationForm(FlaskForm):
@@ -702,83 +703,202 @@ def check_mpesa_status(checkout_request_id):
 
 @app.route('/mpesa_callback', methods=['POST'])
 def mpesa_callback():
+    """
+    Handle M-Pesa STK Push callbacks
+    """
     try:
+        # Log the entire callback data for debugging
         callback_data = request.get_json()
-        print("M-Pesa Callback Data:", callback_data)  # Debug log
+        print("Raw Callback Data:", json.dumps(callback_data, indent=2))
 
-        # Extract the STK callback data
-        stk_callback = callback_data.get('Body', {}).get('stkCallback', {})
+        # Extract the stkCallback data
+        body = callback_data.get('Body', {})
+        stk_callback = body.get('stkCallback', {})
+
+        # Get the checkout request ID and result code
         checkout_request_id = stk_callback.get('CheckoutRequestID')
         result_code = stk_callback.get('ResultCode')
 
-        # Find the payment record
+        print(f"Processing callback for checkout_request_id: {checkout_request_id}")
+        print(f"Result code: {result_code}")
+
+        # Find the corresponding payment record
         payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
         if not payment:
-            print(f"Payment not found for CheckoutRequestID: {checkout_request_id}")
+            print(f"No payment found for checkout_request_id: {checkout_request_id}")
             return jsonify({'error': 'Payment not found'}), 404
 
-        # Handle successful payment
+        # Handle successful transaction
         if result_code == 0:
-            try:
-                # Extract payment details from callback metadata
-                callback_metadata = stk_callback.get('CallbackMetadata', {}).get('Item', [])
-                mpesa_receipt_number = None
-                amount = None
-                transaction_date = None
-                phone_number = None
+            # Extract CallbackMetadata
+            callback_metadata = stk_callback.get('CallbackMetadata', {})
+            if not callback_metadata:
+                print("No CallbackMetadata found in response")
+                return jsonify({'error': 'No callback metadata'}), 400
 
-                # Extract specific fields from metadata
-                for item in callback_metadata:
-                    if item.get('Name') == 'MpesaReceiptNumber':
-                        mpesa_receipt_number = str(item.get('Value'))
-                    elif item.get('Name') == 'Amount':
-                        amount = item.get('Value')
-                    elif item.get('Name') == 'TransactionDate':
-                        transaction_date = str(item.get('Value'))
-                    elif item.get('Name') == 'PhoneNumber':
-                        phone_number = str(item.get('Value'))
+            items = callback_metadata.get('Item', [])
+            print("Callback Metadata Items:", json.dumps(items, indent=2))
 
-                print(f"Extracted M-Pesa Receipt Number: {mpesa_receipt_number}")  # Debug log
+            # Initialize variables
+            mpesa_receipt_number = None
+            amount = None
+            transaction_date = None
+            phone_number = None
 
-                if mpesa_receipt_number:
-                    # Update payment record with transaction details
-                    payment.payment_status = "Completed"
-                    payment.mpesa_transaction_id = mpesa_receipt_number
+            # Extract metadata items
+            for item in items:
+                name = item.get('Name')
+                value = item.get('Value')
+                print(f"Processing metadata item - Name: {name}, Value: {value}")
 
-                    # Update order status
-                    order = Order.query.get(payment.order_id)
-                    if order:
-                        order.status = "Processing"
+                if name == 'MpesaReceiptNumber':
+                    mpesa_receipt_number = str(value)
+                elif name == 'Amount':
+                    amount = value
+                elif name == 'TransactionDate':
+                    transaction_date = value
+                elif name == 'PhoneNumber':
+                    phone_number = str(value)
 
-                    # Commit the transaction
+            print(f"Extracted Receipt Number: {mpesa_receipt_number}")
+            print(f"Extracted Amount: {amount}")
+            print(f"Extracted Phone: {phone_number}")
+            print(f"Extracted Date: {transaction_date}")
+
+            if mpesa_receipt_number:
+                # Update payment record
+                payment.payment_status = "Completed"
+                payment.mpesa_transaction_id = mpesa_receipt_number
+
+                # Update order status
+                order = Order.query.get(payment.order_id)
+                if order:
+                    order.status = "Processing"
+
+                try:
                     db.session.commit()
-                    print(f"Payment completed successfully. Order ID: {payment.order_id}, "
-                          f"Transaction ID: {payment.mpesa_transaction_id}")
-                else:
-                    print("Warning: No M-Pesa receipt number found in callback data")
+                    print(f"Payment updated with transaction ID: {mpesa_receipt_number}")
+                    return jsonify({
+                        'success': True,
+                        'status': 'Completed',
+                        'transaction_id': mpesa_receipt_number
+                    })
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"Database error: {str(e)}")
+                    raise
+            else:
+                print("No MpesaReceiptNumber found in callback metadata")
+                payment.payment_status = "Failed"
+                db.session.commit()
+                return jsonify({
+                    'success': False,
+                    'status': 'Failed',
+                    'message': 'No transaction ID received'
+                })
 
-            except Exception as e:
-                db.session.rollback()
-                print(f"Error updating payment record: {str(e)}")
-                raise
-
-        # Handle failed payment
-        elif result_code not in [None, "", "Pending"]:
+        else:
+            # Handle failed transaction
+            print(f"Transaction failed with result code: {result_code}")
             payment.payment_status = "Failed"
             db.session.commit()
-            print(f"Payment failed with ResultCode: {result_code}")
-
-        return jsonify({'success': True}), 200
+            return jsonify({
+                'success': False,
+                'status': 'Failed',
+                'message': f'Transaction failed with code: {result_code}'
+            })
 
     except Exception as e:
-        print(f"Error processing M-Pesa callback: {str(e)}")
+        print(f"Error in callback: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/initiate_payment', methods=['POST'])
+def initiate_payment():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'error': 'Please login to checkout'}), 401
+
+        order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+        if not order:
+            return jsonify({'error': 'No pending order found'}), 404
+
+        # Check if payment already exists
+        if order.payment:
+            # If payment exists and is pending, return existing checkout request ID
+            if order.payment.payment_status == "Pending":
+                return jsonify({
+                    'success': True,
+                    'message': 'Payment already initiated. Please check your phone.',
+                    'checkout_request_id': order.payment.checkout_request_id
+                })
+            # If payment exists but failed, delete it to create new one
+            db.session.delete(order.payment)
+            db.session.commit()
+
+        phone_number = request.form.get('phone_number', '').strip()
+        if not phone_number:
+            return jsonify({'error': 'Phone number is required'}), 400
+
+        # Format phone number
+        if phone_number.startswith('+'):
+            phone_number = phone_number[1:]
+        elif phone_number.startswith('0'):
+            phone_number = '254' + phone_number[1:]
+        elif not phone_number.startswith('254'):
+            phone_number = '254' + phone_number
+
+        if not phone_number.isdigit() or len(phone_number) != 12:
+            return jsonify({'error': 'Invalid phone number format'}), 400
+
+        amount = int(order.total_price)
+
+        # Create new payment record
+        payment = Payment(
+            order_id=order.id,
+            payment_method="MPESA",
+            payment_status="Pending",
+            phone_number=phone_number
+        )
+        db.session.add(payment)
+        db.session.commit()
+
+        try:
+            mpesa = LipaNaMpesaOnline()
+            callback_url = urljoin(NGROK_URL, '/mpesa_callback')
+            print(f"Initiating payment for order {order.id} with callback URL: {callback_url}")
+
+            response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
+            print(f"M-Pesa API Response: {response}")
+
+            if 'CheckoutRequestID' in response:
+                payment.checkout_request_id = response['CheckoutRequestID']
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'Payment initiated. Please check your phone.',
+                    'checkout_request_id': response['CheckoutRequestID']
+                })
+
+            raise Exception("No CheckoutRequestID in M-Pesa response")
+
+        except Exception as e:
+            db.session.delete(payment)
+            db.session.commit()
+            raise
+
+    except Exception as e:
+        print(f"Payment initiation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Payment initiation failed: {str(e)}'
+        }), 500
 
 
 @app.route('/check_payment_status/<checkout_request_id>')
 def check_payment_status(checkout_request_id):
     try:
-        # Find payment record
+        # Find payment record with explicit join to Order
         payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
         if not payment:
             return jsonify({
@@ -786,26 +906,16 @@ def check_payment_status(checkout_request_id):
                 'message': 'Payment not found'
             }), 404
 
-        # If payment is already completed
+        print(f"Checking status for payment {payment.id}, Order {payment.order_id}")
+
         if payment.payment_status == "Completed" and payment.mpesa_transaction_id:
-            try:
-                # Ensure order status is updated
-                order = Order.query.get(payment.order_id)
-                if order and order.status == "Pending":
-                    order.status = "Processing"
-                    db.session.commit()
+            return jsonify({
+                'status': 'Completed',
+                'order_id': payment.order_id,
+                'transaction_id': payment.mpesa_transaction_id
+            })
 
-                return jsonify({
-                    'status': 'Completed',
-                    'order_id': payment.order_id,
-                    'transaction_id': payment.mpesa_transaction_id
-                })
-            except Exception as e:
-                db.session.rollback()
-                print(f"Error updating order status: {str(e)}")
-                raise
-
-        elif payment.payment_status == "Failed":
+        if payment.payment_status == "Failed":
             return jsonify({
                 'status': 'Failed',
                 'message': 'Payment failed. Please try again.'
@@ -813,6 +923,8 @@ def check_payment_status(checkout_request_id):
 
         # Check M-Pesa status for pending payments
         mpesa_status = check_mpesa_status(checkout_request_id)
+        print(f"M-Pesa status response: {mpesa_status}")
+
         if not mpesa_status:
             return jsonify({
                 'status': 'Pending',
@@ -820,37 +932,25 @@ def check_payment_status(checkout_request_id):
             })
 
         result_code = mpesa_status.get('ResultCode')
-        if isinstance(result_code, str):
-            try:
-                result_code = int(result_code)
-            except (ValueError, TypeError):
-                result_code = None
+        try:
+            result_code = int(result_code) if result_code is not None else None
+        except (ValueError, TypeError):
+            result_code = None
 
-        # Process M-Pesa status response
         if result_code == 0:
-            # Extract transaction ID from status check if available
+            payment.payment_status = "Completed"
             transaction_id = mpesa_status.get('MpesaReceiptNumber')
-            try:
-                payment.payment_status = "Completed"
-                if transaction_id:
-                    payment.mpesa_transaction_id = transaction_id
+            if transaction_id:
+                payment.mpesa_transaction_id = transaction_id
 
-                order = Order.query.get(payment.order_id)
-                if order:
-                    order.status = "Processing"
-                db.session.commit()
+            db.session.commit()
+            return jsonify({
+                'status': 'Completed',
+                'order_id': payment.order_id,
+                'transaction_id': payment.mpesa_transaction_id
+            })
 
-                return jsonify({
-                    'status': 'Completed',
-                    'order_id': payment.order_id,
-                    'transaction_id': payment.mpesa_transaction_id
-                })
-            except Exception as e:
-                db.session.rollback()
-                print(f"Error updating payment status: {str(e)}")
-                raise
-
-        elif result_code is not None:
+        if result_code is not None:
             payment.payment_status = "Failed"
             db.session.commit()
             return jsonify({
@@ -866,80 +966,8 @@ def check_payment_status(checkout_request_id):
     except Exception as e:
         print(f"Error checking payment status: {str(e)}")
         return jsonify({
-            'status': 'Pending',
-            'message': 'Payment status check is temporarily unavailable'
-        })
-
-# Modify your initiate_payment route
-@app.route('/initiate_payment', methods=['POST'])
-def initiate_payment():
-    try:
-        if 'user_id' not in session:
-            return jsonify({'error': 'Please login to checkout'}), 401
-
-        if not NGROK_URL:
-            return jsonify({'error': 'Callback URL not configured. Please ensure ngrok is running.'}), 500
-
-        phone_number = request.form.get('phone_number')
-        if not phone_number:
-            return jsonify({'error': 'Phone number is required'}), 400
-
-        # Clean and format phone number
-        phone_number = phone_number.strip()
-        if phone_number.startswith('+'):
-            phone_number = phone_number[1:]
-        elif phone_number.startswith('0'):
-            phone_number = '254' + phone_number[1:]
-        elif not phone_number.startswith('254'):
-            phone_number = '254' + phone_number
-
-        # Validate phone number format
-        if not phone_number.isdigit() or len(phone_number) != 12:
-            return jsonify({'error': 'Invalid phone number format'}), 400
-
-        order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
-        if not order:
-            return jsonify({'error': 'No pending order found'}), 404
-
-        amount = int(order.total_price)
-
-        # Create payment record
-        payment = Payment(
-            order_id=order.id,
-            payment_method="MPESA",
-            payment_status="Pending",
-            phone_number=phone_number
-        )
-        db.session.add(payment)
-        db.session.commit()
-
-        # Initialize STK Push with ngrok callback URL
-        mpesa = LipaNaMpesaOnline()
-        callback_url = urljoin(NGROK_URL, '/mpesa_callback')
-        print(f"Callback URL: {callback_url}")  # For debugging
-
-        response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
-
-        if 'CheckoutRequestID' in response:
-            payment.checkout_request_id = response['CheckoutRequestID']
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Payment initiated. Please check your phone to complete payment.',
-                'checkout_request_id': response['CheckoutRequestID']
-            })
-
-        return jsonify({
-            'success': False,
-            'message': 'Failed to initiate payment. Please try again.'
-        }), 500
-
-    except Exception as e:
-        print(f"Payment initiation error: {str(e)}")
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'Failed to initiate payment: {str(e)}'
+            'status': 'Error',
+            'message': str(e)
         }), 500
 
 
