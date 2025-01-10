@@ -67,9 +67,16 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
 
     const payButton = document.getElementById('payButton');
     const statusDiv = document.getElementById('paymentStatus');
+    const phoneNumber = document.getElementById('phone_number').value;
+
+    // Basic phone number validation
+    if (!phoneNumber) {
+        showStatus('danger', 'Please enter a phone number.');
+        return;
+    }
 
     payButton.disabled = true;
-    payButton.innerHTML = 'Processing...';
+    payButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
 
     fetch('/initiate_payment', {
         method: 'POST',
@@ -77,79 +84,127 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-            'phone_number': document.getElementById('phone_number').value
+            'phone_number': phoneNumber
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            statusDiv.style.display = 'block';
-            // Poll for payment status
+            showStatus('info', `
+                <h5>Payment Initiated!</h5>
+                <p>Please check your phone for the M-Pesa prompt.</p>
+                <p>Enter your PIN to complete the payment.</p>
+                <div class="progress mt-2">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            `);
             pollPaymentStatus(data.checkout_request_id);
         } else {
-            alert(data.message);
-            payButton.disabled = false;
-            payButton.innerHTML = 'Pay with M-Pesa';
+            let errorMessage = 'Payment initiation failed. ';
+            if (data.message) {
+                errorMessage += data.message;
+            }
+            errorMessage += '<br>Please try again or contact support if the problem persists.';
+            showStatus('danger', errorMessage);
+            resetPayButton();
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred. Please try again.');
-        payButton.disabled = false;
-        payButton.innerHTML = 'Pay with M-Pesa';
+        showStatus('danger', `
+            <h5>Connection Error</h5>
+            <p>Could not connect to the payment service.</p>
+            <p>Please check your internet connection and try again.</p>
+        `);
+        resetPayButton();
     });
 });
 
-function pollPaymentStatus(checkoutRequestId) {
+function showStatus(type, message) {
     const statusDiv = document.getElementById('paymentStatus');
     const messageDiv = statusDiv.querySelector('.alert');
-    const payButton = document.getElementById('payButton');
-    let attempts = 0;
-    const maxAttempts = 60; // Poll for 5 minutes maximum
+    statusDiv.style.display = 'block';
+    messageDiv.className = `alert alert-${type}`;
+    messageDiv.innerHTML = message;
+}
 
-    messageDiv.className = 'alert alert-info';
-    messageDiv.innerHTML = '<p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>' +
-                          '<p>Waiting for payment confirmation...</p>';
+function resetPayButton() {
+    const payButton = document.getElementById('payButton');
+    payButton.disabled = false;
+    payButton.innerHTML = 'Pay with M-Pesa';
+}
+
+function pollPaymentStatus(checkoutRequestId) {
+    const maxAttempts = 60; // 5 minutes maximum (5000ms * 60)
+    let attempts = 0;
 
     const pollInterval = setInterval(() => {
         attempts++;
         fetch(`/check_payment_status/${checkoutRequestId}`)
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'Completed') {
-                    clearInterval(pollInterval);
-                    messageDiv.className = 'alert alert-success';
-                    messageDiv.innerHTML = '<p>Payment successful! Redirecting to order confirmation...</p>';
-                    setTimeout(() => {
-                        window.location.href = `/order_confirmation/${data.order_id}`;
-                    }, 2000);
-                } else if (data.status === 'Failed') {
-                    clearInterval(pollInterval);
-                    messageDiv.className = 'alert alert-danger';
-                    messageDiv.innerHTML = `<p><strong>Payment Failed:</strong> ${data.message}</p>` +
-                                         '<p>Please try again or use a different phone number.</p>';
-                    payButton.disabled = false;
-                    payButton.innerHTML = 'Pay with M-Pesa';
-                } else if (attempts >= maxAttempts) {
-                    clearInterval(pollInterval);
-                    messageDiv.className = 'alert alert-warning';
-                    messageDiv.innerHTML = '<p>Payment status check timed out.</p>' +
-                                         '<p>If you completed the payment, please contact support.</p>';
-                    payButton.disabled = false;
-                    payButton.innerHTML = 'Pay with M-Pesa';
-                } else {
-                    // Still pending
-                    messageDiv.innerHTML = '<p>Waiting for payment confirmation...</p>' +
-                                         '<p>Please complete the payment on your phone if you haven\'t already.</p>';
+                switch(data.status) {
+                    case 'Completed':
+                        clearInterval(pollInterval);
+                        showStatus('success', `
+                            <h5>Payment Successful!</h5>
+                            <p>Transaction ID: ${data.transaction_id}</p>
+                            <p>Order ID: ${data.order_id}</p>
+                            <p>Redirecting to order confirmation...</p>
+                        `);
+                        setTimeout(() => {
+                            window.location.href = `/order_confirmation/${data.order_id}`;
+                        }, 3000);
+                        break;
+
+                    case 'Failed':
+                        clearInterval(pollInterval);
+                        showStatus('danger', `
+                            <h5>Payment Failed</h5>
+                            <p>${data.message || 'The payment could not be processed.'}</p>
+                            <p>Please try again or use a different phone number.</p>
+                        `);
+                        resetPayButton();
+                        break;
+
+                    case 'Pending':
+                        showStatus('info', `
+                            <h5>Payment Processing</h5>
+                            <p>Waiting for payment confirmation...</p>
+                            <p>Please complete the payment on your phone if you haven't already.</p>
+                            <div class="progress mt-2">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width: 100%"></div>
+                            </div>
+                        `);
+                        break;
+
+                    default:
+                        if (attempts >= maxAttempts) {
+                            clearInterval(pollInterval);
+                            showStatus('warning', `
+                                <h5>Payment Status Unknown</h5>
+                                <p>The payment status check has timed out.</p>
+                                <p>If you completed the payment, please contact support with your M-Pesa transaction ID.</p>
+                            `);
+                            resetPayButton();
+                        }
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                messageDiv.className = 'alert alert-warning';
-                messageDiv.innerHTML = '<p>Error checking payment status.</p>' +
-                                     '<p>Please wait or contact support if you\'ve completed the payment.</p>';
+                showStatus('warning', `
+                    <h5>Connection Error</h5>
+                    <p>Unable to check payment status.</p>
+                    <p>If you've completed the payment, please wait or contact support.</p>
+                `);
             });
     }, 5000);
+
+    // Cleanup after 5 minutes
+    setTimeout(() => {
+        clearInterval(pollInterval);
+    }, 300000);
 }
 </script>
 {% endblock %}
