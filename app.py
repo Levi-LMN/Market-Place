@@ -32,6 +32,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_ENABLED'] = True
 # Add this configuration after your other app configs
 NGROK_URL = None  # This will be updated when you start your application
+app.config['BASE_URL'] = 'https://LevisHub.pythonanywhere.com'
+
 
 db = SQLAlchemy(app)
 
@@ -813,6 +815,7 @@ def mpesa_callback():
         return jsonify({'error': str(e)}), 500
 
 
+# Replace the initiate_payment route with this updated version
 @app.route('/initiate_payment', methods=['POST'])
 def initiate_payment():
     try:
@@ -865,7 +868,7 @@ def initiate_payment():
 
         try:
             mpesa = LipaNaMpesaOnline()
-            callback_url = urljoin(NGROK_URL, '/mpesa_callback')
+            callback_url = f"{app.config['BASE_URL']}/mpesa_callback"
             print(f"Initiating payment for order {order.id} with callback URL: {callback_url}")
 
             response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
@@ -971,7 +974,7 @@ def check_payment_status(checkout_request_id):
         }), 500
 
 
-# Add this at the bottom of your file, just before app.run()
+# Replace the main block with this simplified version
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -981,20 +984,5 @@ if __name__ == '__main__':
         if not Role.query.filter_by(name='customer').first():
             db.session.add(Role(name='customer'))
         db.session.commit()
-
-    # Check if ngrok is running and get the public URL
-    try:
-        ngrok_api_response = requests.get('http://localhost:4040/api/tunnels')
-        tunnels = ngrok_api_response.json()['tunnels']
-        NGROK_URL = [t['public_url'] for t in tunnels if t['public_url'].startswith('https')][0]
-        print(f"\nNgrok tunnel established at: {NGROK_URL}")
-    except Exception as e:
-        print("\nError: Ngrok is not running. Please start ngrok first.")
-        print("Follow these steps to set up ngrok:")
-        print("1. Download ngrok from https://ngrok.com/download")
-        print("2. Extract the downloaded file")
-        print("3. Open a new terminal and navigate to the ngrok folder")
-        print("4. Run: ngrok http 5000")
-        sys.exit(1)
 
     app.run(debug=True)
