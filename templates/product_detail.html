@@ -5,34 +5,297 @@
 {% endblock %}
 
 {% block content %}
-<h2>{{ product.name }}</h2>
-<p>{{ product.description }}</p>
-<p>Price: ${{ product.price }}</p>
-<p>Stock Quantity: {{ product.stock_quantity }}</p>
+<div class="product-container">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+        <a href="{{ url_for('home') }}">Home</a>
+        <span>/</span>
+        <a href="{{ url_for('products') }}">Products</a>
+        <span>/</span>
+        <span class="current">{{ product.name }}</span>
+    </nav>
 
-<!-- Display all product images -->
-<div>
-   {% if product.images %}
-       {% for image in product.images %}
-           <img src="{{ url_for('static', filename='uploads/' + image.image_url) }}"
-                alt="Image of {{ product.name }}"
-                style="width: 300px; height: auto;">
-       {% endfor %}
-   {% else %}
-       <p>No image available for this product.</p>
-   {% endif %}
+    <div class="product-grid">
+        <!-- Image Gallery Section -->
+        <div class="image-section">
+            <div class="image-badges">
+                {% if product.is_new %}
+                    <span class="badge new">New</span>
+                {% endif %}
+                {% if product.discount %}
+                    <span class="badge sale">Sale</span>
+                {% endif %}
+            </div>
+
+            <div class="main-image-container" id="image-container">
+                {% if product.images %}
+                    <div class="image-wrapper">
+                        <img id="main-image"
+                             src="{{ url_for('static', filename='uploads/' + product.images[0].image_url) }}"
+                             alt="Image of {{ product.name }}">
+                    </div>
+
+                    <button class="nav-btn prev-btn" id="prev-btn">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="nav-btn next-btn" id="next-btn">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+
+                    <button class="zoom-btn" onclick="toggleZoom()">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                {% else %}
+                    <div class="no-image">
+                        <i class="bi bi-image"></i>
+                        <p>No image available</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="thumbnail-strip">
+                {% for image in product.images %}
+                    <div class="thumbnail"
+                         onclick="updateMainImage('{{ url_for('static', filename='uploads/' + image.image_url) }}', {{ loop.index0 }})">
+                        <img src="{{ url_for('static', filename='uploads/' + image.image_url) }}"
+                             alt="Thumbnail of {{ product.name }}">
+                        <div class="thumbnail-overlay"></div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Product Info Section -->
+        <div class="product-info">
+            <div class="product-header">
+                <h1>{{ product.name }}</h1>
+                <div class="price-section">
+                    {% if product.original_price and product.original_price > product.price %}
+                        <span class="original-price">${{ product.original_price }}</span>
+                    {% endif %}
+                    <span class="current-price">${{ product.price }}</span>
+                </div>
+            </div>
+
+            {% if product.rating %}
+            <div class="rating">
+                {% for i in range(5) %}
+                    <i class="bi bi-star-fill {% if i < product.rating|int %}filled{% endif %}"></i>
+                {% endfor %}
+                <span class="rating-count">({{ product.review_count }} reviews)</span>
+            </div>
+            {% endif %}
+
+            <div class="product-description">
+                {{ product.description }}
+            </div>
+
+            <div class="features-grid">
+                <div class="feature">
+                    <i class="bi bi-truck"></i>
+                    <span>Free Shipping</span>
+                </div>
+                <div class="feature">
+                    <i class="bi bi-shield-check"></i>
+                    <span>1 Year Warranty</span>
+                </div>
+                <div class="feature">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    <span>30-Day Returns</span>
+                </div>
+                <div class="feature">
+                    <i class="bi bi-patch-check"></i>
+                    <span>Genuine Product</span>
+                </div>
+            </div>
+
+            <div class="stock-status {% if product.stock_quantity > 0 %}in-stock{% else %}out-of-stock{% endif %}">
+                <div class="stock-indicator">
+                    <div class="indicator-dot"></div>
+                    {% if product.stock_quantity > 0 %}
+                        <span>In Stock</span>
+                        <span class="stock-count">({{ product.stock_quantity }} available)</span>
+                    {% else %}
+                        <span>Out of Stock</span>
+                    {% endif %}
+                </div>
+                {% if product.stock_quantity <= 5 and product.stock_quantity > 0 %}
+                    <div class="low-stock-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Only {{ product.stock_quantity }} left in stock - order soon
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Purchase Card -->
+            <div class="purchase-card">
+                <form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}" class="purchase-form">
+                    <div class="quantity-selector">
+                        <label for="quantity">Quantity</label>
+                        <div class="quantity-controls">
+                            <button type="button" onclick="decrementQuantity()" class="qty-btn">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <input type="number" id="quantity" name="quantity" value="1"
+                                   min="1" max="{{ product.stock_quantity }}" required>
+                            <button type="button" onclick="incrementQuantity()" class="qty-btn">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if existing_order_item %}
+                        <div class="cart-notice">
+                            <i class="bi bi-cart-check"></i>
+                            <span>Already in cart: {{ existing_order_item.quantity }}</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="purchase-buttons">
+                        <button type="submit" class="primary-btn add-to-cart">
+                            <i class="bi bi-cart-plus"></i>
+                            <span>{% if existing_order_item %}Update Cart{% else %}Add to Cart{% endif %}</span>
+                        </button>
+                        <button type="button" class="primary-btn buy-now">
+                            <i class="bi bi-lightning"></i>
+                            <span>Buy Now</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="alternative-purchase">
+                    <a href="https://wa.me/{{ whatsapp_number }}?text=Hello%2C%20I%20am%20interested%20in%20{{ product.name }}."
+                       class="whatsapp-btn" target="_blank">
+                        <i class="bi bi-whatsapp"></i>
+                        <span>Quick Order via WhatsApp</span>
+                    </a>
+
+                    <a href="tel:{{ phone_number }}" class="phone-btn">
+                        <i class="bi bi-telephone"></i>
+                        <span>Call for Support</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Delivery Info -->
+            <div class="delivery-info">
+                <div class="delivery-time">
+                    <i class="bi bi-clock"></i>
+                    <div>
+                        <h4>Estimated Delivery</h4>
+                        <p>2-4 Business Days</p>
+                    </div>
+                </div>
+                <div class="delivery-location">
+                    <i class="bi bi-geo-alt"></i>
+                    <div>
+                        <h4>Delivering to</h4>
+                        <button class="change-location" onclick="updateLocation()">
+                            Select Location <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<h3>Order Quantity</h3>
-<form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}">
-   {% if existing_order_item %}
-       <p>Already in cart: {{ existing_order_item.quantity }}</p>
-   {% endif %}
-   <input type="number" name="quantity" value="1" min="1" max="{{ product.stock_quantity }}" required>
-   <button type="submit" class="btn btn-primary">
-       {% if existing_order_item %}Update Cart{% else %}Add to Cart{% endif %}
-   </button>
-</form>
+<style>
 
-<p><a href="{{ url_for('products') }}" class="btn btn-secondary">Back to Products</a></p>
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const images = {{ images|tojson }};
+    let currentIndex = 0;
+    const mainImage = document.getElementById('main-image');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const imageWrapper = document.querySelector('.image-wrapper');
+    let isZoomed = false;
+
+    function updateImage(index) {
+        currentIndex = (index + images.length) % images.length;
+        const imagePath = "{{ url_for('static', filename='uploads/') }}" + images[currentIndex].image_url;
+        mainImage.src = imagePath;
+
+        // Update thumbnails
+        document.querySelectorAll('.thumbnail').forEach((thumb, idx) => {
+            thumb.classList.toggle('active', idx === currentIndex);
+        });
+    }
+
+    if (prevBtn && nextBtn) {
+        prevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            updateImage(currentIndex - 1);
+        });
+
+        nextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            updateImage(currentIndex + 1);
+        });
+    }
+
+    // Image zoom functionality
+    function toggleZoom() {
+        isZoomed = !isZoomed;
+        imageWrapper.classList.toggle('zoomed', isZoomed);
+        const zoomBtn = document.querySelector('.zoom-btn i');
+        zoomBtn.classList.toggle('bi-zoom-in', !isZoomed);
+        zoomBtn.classList.toggle('bi-zoom-out', isZoomed);
+    }
+
+    // Pan functionality when zoomed
+    let isPanning = false;
+    let startX, startY, initialX, initialY;
+
+    imageWrapper.addEventListener('mousedown', function(e) {
+        if (!isZoomed) return;
+        isPanning = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        initialX = imageWrapper.offsetLeft;
+        initialY = imageWrapper.offsetTop;
+        imageWrapper.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (!isPanning) return;
+        e.preventDefault();
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        imageWrapper.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+    });
+
+    document.addEventListener('mouseup', function() {
+        isPanning = false;
+        imageWrapper.style.cursor = 'zoom-out';
+    });
+
+    // Quantity controls
+    window.incrementQuantity = function() {
+        const input = document.getElementById('quantity');
+        const max = parseInt(input.max);
+        const currentValue = parseInt(input.value);
+        if (currentValue < max) {
+            input.value = currentValue + 1;
+        }
+    }
+
+    window.decrementQuantity = function() {
+        const input = document.getElementById('quantity');
+        const currentValue = parseInt(input.value);
+        if (currentValue > 1) {
+            input.value = currentValue - 1;
+        }
+    }
+
+    // Update location modal
+    window.updateLocation = function() {
+        // Implement location selector modal
+        alert('Location selector coming soon!');
+    }
+});
+</script>
 {% endblock %}

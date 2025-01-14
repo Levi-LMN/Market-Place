@@ -21,7 +21,10 @@ import os
 from urllib.parse import urljoin
 import sys
 
-
+# Add these imports if not already present
+from datetime import datetime, timedelta
+import threading
+import time
 
 UPLOAD_FOLDER = 'static/uploads'
 app = Flask(__name__)
@@ -302,7 +305,15 @@ def product_detail(product_id):
         if order:
             existing_order_item = OrderItem.query.filter_by(order_id=order.id, product_id=product_id).first()
 
-    return render_template('product_detail.html', product=product, existing_order_item=existing_order_item)
+    # Convert product images to a JSON-serializable format
+    serialized_images = [{"image_url": image.image_url} for image in product.images]
+
+    return render_template(
+        'product_detail.html',
+        product=product,
+        existing_order_item=existing_order_item,
+        images=serialized_images  # Pass serialized images
+    )
 
 
 @app.route('/admin/add_product', methods=['GET', 'POST'])
@@ -701,117 +712,158 @@ def check_mpesa_status(checkout_request_id):
         return {"ResultCode": -1, "ResultDesc": "Error querying status"}
 
 
+# Add a new function to continuously check pending payments
+def check_pending_payments():
+    while True:
+        with app.app_context():
+            try:
+                # Get all pending payments from last 24 hours
+                cutoff_time = datetime.now() - timedelta(hours=24)
+                pending_payments = Payment.query.filter(
+                    Payment.payment_status == "Pending",
+                    Payment.created_at >= cutoff_time
+                ).all()
+
+                for payment in pending_payments:
+                    if payment.checkout_request_id:
+                        mpesa_status = check_mpesa_status(payment.checkout_request_id)
+
+                        if mpesa_status.get('ResultCode') == 0:
+                            # Payment successful
+                            payment.payment_status = "Completed"
+                            payment.mpesa_transaction_id = mpesa_status.get('MpesaReceiptNumber')
+
+                            # Update order status
+                            order = Order.query.get(payment.order_id)
+                            if order:
+                                order.status = "Processing"
+
+                            db.session.commit()
+                            print(f"Payment {payment.id} completed successfully")
+
+                        elif mpesa_status.get('ResultCode') is not None:
+                            # Payment failed
+                            payment.payment_status = "Failed"
+                            db.session.commit()
+                            print(f"Payment {payment.id} failed")
+
+            except Exception as e:
+                print(f"Error checking pending payments: {str(e)}")
+
+            # Wait for 30 seconds before next check
+            time.sleep(30)
+
+
+# Modify the check_payment_status route
+@app.route('/check_payment_status/<checkout_request_id>')
+def check_payment_status(checkout_request_id):
+    try:
+        payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
+        if not payment:
+            return jsonify({
+                'status': 'Failed',
+                'message': 'Payment not found'
+            }), 404
+
+        if payment.payment_status == "Completed" and payment.mpesa_transaction_id:
+            # Clear cart only if not already processed
+            order = Order.query.get(payment.order_id)
+            if order and order.status == "Pending":
+                order.status = "Processing"
+                db.session.commit()
+
+            return jsonify({
+                'status': 'Completed',
+                'order_id': payment.order_id,
+                'transaction_id': payment.mpesa_transaction_id
+            })
+
+        if payment.payment_status == "Failed":
+            return jsonify({
+                'status': 'Failed',
+                'message': 'Payment failed. Please try again.'
+            })
+
+        # For pending payments, check M-Pesa status
+        mpesa_status = check_mpesa_status(payment.checkout_request_id)
+
+        if mpesa_status.get('ResultCode') == 0:
+            payment.payment_status = "Completed"
+            payment.mpesa_transaction_id = mpesa_status.get('MpesaReceiptNumber')
+
+            # Update order status
+            order = Order.query.get(payment.order_id)
+            if order:
+                order.status = "Processing"
+
+            db.session.commit()
+
+            return jsonify({
+                'status': 'Completed',
+                'order_id': payment.order_id,
+                'transaction_id': payment.mpesa_transaction_id
+            })
+
+        return jsonify({
+            'status': 'Pending',
+            'message': 'Payment is being processed'
+        })
+
+    except Exception as e:
+        print(f"Error checking payment status: {str(e)}")
+        return jsonify({
+            'status': 'Error',
+            'message': str(e)
+        }), 500
+
+
+# Modify the mpesa_callback route
 @app.route('/mpesa_callback', methods=['POST'])
 def mpesa_callback():
-    """
-    Handle M-Pesa STK Push callbacks
-    """
     try:
-        # Log the entire callback data for debugging
         callback_data = request.get_json()
-        print("Raw Callback Data:", json.dumps(callback_data, indent=2))
-
-        # Extract the stkCallback data
         body = callback_data.get('Body', {})
         stk_callback = body.get('stkCallback', {})
 
-        # Get the checkout request ID and result code
         checkout_request_id = stk_callback.get('CheckoutRequestID')
         result_code = stk_callback.get('ResultCode')
 
-        print(f"Processing callback for checkout_request_id: {checkout_request_id}")
-        print(f"Result code: {result_code}")
-
-        # Find the corresponding payment record
         payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
         if not payment:
             print(f"No payment found for checkout_request_id: {checkout_request_id}")
             return jsonify({'error': 'Payment not found'}), 404
 
-        # Handle successful transaction
         if result_code == 0:
-            # Extract CallbackMetadata
             callback_metadata = stk_callback.get('CallbackMetadata', {})
-            if not callback_metadata:
-                print("No CallbackMetadata found in response")
-                return jsonify({'error': 'No callback metadata'}), 400
-
             items = callback_metadata.get('Item', [])
-            print("Callback Metadata Items:", json.dumps(items, indent=2))
 
-            # Initialize variables
             mpesa_receipt_number = None
-            amount = None
-            transaction_date = None
-            phone_number = None
-
-            # Extract metadata items
             for item in items:
-                name = item.get('Name')
-                value = item.get('Value')
-                print(f"Processing metadata item - Name: {name}, Value: {value}")
-
-                if name == 'MpesaReceiptNumber':
-                    mpesa_receipt_number = str(value)
-                elif name == 'Amount':
-                    amount = value
-                elif name == 'TransactionDate':
-                    transaction_date = value
-                elif name == 'PhoneNumber':
-                    phone_number = str(value)
-
-            print(f"Extracted Receipt Number: {mpesa_receipt_number}")
-            print(f"Extracted Amount: {amount}")
-            print(f"Extracted Phone: {phone_number}")
-            print(f"Extracted Date: {transaction_date}")
+                if item.get('Name') == 'MpesaReceiptNumber':
+                    mpesa_receipt_number = str(item.get('Value'))
+                    break
 
             if mpesa_receipt_number:
-                # Update payment record
                 payment.payment_status = "Completed"
                 payment.mpesa_transaction_id = mpesa_receipt_number
 
-                # Update order status
+                # Update order status if not already processed
                 order = Order.query.get(payment.order_id)
-                if order:
+                if order and order.status == "Pending":
                     order.status = "Processing"
 
-                try:
-                    db.session.commit()
-                    print(f"Payment updated with transaction ID: {mpesa_receipt_number}")
-                    return jsonify({
-                        'success': True,
-                        'status': 'Completed',
-                        'transaction_id': mpesa_receipt_number
-                    })
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"Database error: {str(e)}")
-                    raise
-            else:
-                print("No MpesaReceiptNumber found in callback metadata")
-                payment.payment_status = "Failed"
                 db.session.commit()
-                return jsonify({
-                    'success': False,
-                    'status': 'Failed',
-                    'message': 'No transaction ID received'
-                })
+                print(f"Payment updated with transaction ID: {mpesa_receipt_number}")
 
         else:
-            # Handle failed transaction
-            print(f"Transaction failed with result code: {result_code}")
             payment.payment_status = "Failed"
             db.session.commit()
-            return jsonify({
-                'success': False,
-                'status': 'Failed',
-                'message': f'Transaction failed with code: {result_code}'
-            })
+
+        return jsonify({'success': True})
 
     except Exception as e:
         print(f"Error in callback: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/initiate_payment', methods=['POST'])
 def initiate_payment():
@@ -895,86 +947,71 @@ def initiate_payment():
         }), 500
 
 
-@app.route('/check_payment_status/<checkout_request_id>')
-def check_payment_status(checkout_request_id):
+
+
+# Add this new route to your Flask application
+@app.route('/update_quantity/<int:order_item_id>', methods=['POST'])
+def update_quantity(order_item_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Please login to update cart'}), 401
+
     try:
-        # Find payment record with explicit join to Order
-        payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
-        if not payment:
-            return jsonify({
-                'status': 'Failed',
-                'message': 'Payment not found'
-            }), 404
+        data = request.get_json()
+        new_quantity = int(data.get('quantity', 0))
 
-        print(f"Checking status for payment {payment.id}, Order {payment.order_id}")
+        if new_quantity < 1:
+            return jsonify({'error': 'Invalid quantity'}), 400
 
-        if payment.payment_status == "Completed" and payment.mpesa_transaction_id:
-            return jsonify({
-                'status': 'Completed',
-                'order_id': payment.order_id,
-                'transaction_id': payment.mpesa_transaction_id
-            })
+        order_item = OrderItem.query.get_or_404(order_item_id)
 
-        if payment.payment_status == "Failed":
-            return jsonify({
-                'status': 'Failed',
-                'message': 'Payment failed. Please try again.'
-            })
+        # Verify the order belongs to the current user
+        if order_item.order.user_id != session['user_id']:
+            return jsonify({'error': 'Unauthorized'}), 403
 
-        # Check M-Pesa status for pending payments
-        mpesa_status = check_mpesa_status(checkout_request_id)
-        print(f"M-Pesa status response: {mpesa_status}")
+        # Calculate quantity difference
+        quantity_diff = new_quantity - order_item.quantity
 
-        if not mpesa_status:
-            return jsonify({
-                'status': 'Pending',
-                'message': 'Payment is being processed'
-            })
+        # Check if enough stock is available
+        if quantity_diff > 0:
+            product = Product.query.get(order_item.product_id)
+            if product.stock_quantity < quantity_diff:
+                return jsonify({
+                    'error': 'Not enough stock available',
+                    'available_stock': product.stock_quantity
+                }), 400
 
-        result_code = mpesa_status.get('ResultCode')
-        try:
-            result_code = int(result_code) if result_code is not None else None
-        except (ValueError, TypeError):
-            result_code = None
+        # Update product stock
+        product = Product.query.get(order_item.product_id)
+        product.stock_quantity -= quantity_diff
 
-        if result_code == 0:
-            payment.payment_status = "Completed"
-            transaction_id = mpesa_status.get('MpesaReceiptNumber')
-            if transaction_id:
-                payment.mpesa_transaction_id = transaction_id
+        # Update order item quantity
+        order_item.quantity = new_quantity
 
-            db.session.commit()
-            return jsonify({
-                'status': 'Completed',
-                'order_id': payment.order_id,
-                'transaction_id': payment.mpesa_transaction_id
-            })
+        # Update order total price
+        order = Order.query.get(order_item.order_id)
+        order.total_price = sum(item.quantity * item.price_at_time for item in order.order_items)
 
-        if result_code is not None:
-            payment.payment_status = "Failed"
-            db.session.commit()
-            return jsonify({
-                'status': 'Failed',
-                'message': 'Payment failed. Please try again.'
-            })
+        db.session.commit()
 
         return jsonify({
-            'status': 'Pending',
-            'message': 'Payment is being processed'
+            'success': True,
+            'new_quantity': new_quantity,
+            'item_subtotal': order_item.quantity * order_item.price_at_time,
+            'cart_total': order.total_price
         })
 
     except Exception as e:
-        print(f"Error checking payment status: {str(e)}")
-        return jsonify({
-            'status': 'Error',
-            'message': str(e)
-        }), 500
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 # Add this at the bottom of your file, just before app.run()
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        # Start the payment checker in a background thread
+        payment_checker = threading.Thread(target=check_pending_payments, daemon=True)
+        payment_checker.start()
         # Create default roles if they don't exist
         if not Role.query.filter_by(name='admin').first():
             db.session.add(Role(name='admin'))

@@ -1,41 +1,308 @@
-<!-- templates/my_orders.html -->
 {% extends "base.html" %}
 
 {% block title %}My Orders{% endblock %}
 
 {% block content %}
-<main>
-    <section>
-        <h2>My Orders</h2>
-        {% if orders %}
-        <table>
+<div class="orders-container">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+        <a href="{{ url_for('home') }}">Home</a>
+        <span>/</span>
+        <span class="current">My Orders</span>
+    </nav>
+
+    <div class="orders-header">
+        <h1>My Orders</h1>
+    </div>
+
+    {% if orders %}
+    <div class="orders-table-container">
+        <table class="orders-table">
             <thead>
                 <tr>
                     <th>Order ID</th>
                     <th>Date</th>
                     <th>Total Price</th>
                     <th>Status</th>
-                    <th>Details</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for order in orders %}
                 <tr>
-                    <td>{{ order.id }}</td>
-                    <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                    <td>${{ order.total_price }}</td>
-                    <td>{{ order.status }}</td>
-                    <td>
-                        <a href="{{ url_for('order_confirmation', order_id=order.id) }}" class="button">View</a>
+                    <td class="order-id">
+                        <span class="label">Order ID:</span>
+                        #{{ order.id }}
+                    </td>
+                    <td class="order-date">
+                        <span class="label">Date:</span>
+                        <div class="date-info">
+                            <i class="bi bi-calendar3"></i>
+                            {{ order.created_at.strftime('%B %d, %Y') }}
+                            <div class="time">{{ order.created_at.strftime('%I:%M %p') }}</div>
+                        </div>
+                    </td>
+                    <td class="order-price">
+                        <span class="label">Total:</span>
+                        <div class="price">${{ order.total_price }}</div>
+                    </td>
+                    <td class="order-status">
+                        <span class="label">Status:</span>
+                        <span class="status-badge {{ order.status.lower() }}">
+                            <i class="bi bi-circle-fill"></i>
+                            {{ order.status }}
+                        </span>
+                    </td>
+                    <td class="order-actions">
+                        <a href="{{ url_for('order_confirmation', order_id=order.id) }}" class="view-order-btn">
+                            <i class="bi bi-eye"></i>
+                            View Details
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% else %}
-        <p>You have no orders yet. Start shopping now!</p>
-        <a href="{{ url_for('products') }}" class="button">Browse Products</a>
-        {% endif %}
-    </section>
-</main>
+    </div>
+    {% else %}
+    <div class="empty-orders">
+        <div class="empty-orders-content">
+            <i class="bi bi-bag"></i>
+            <h2>No Orders Yet</h2>
+            <p>You haven't placed any orders yet. Start shopping to see your orders here!</p>
+            <a href="{{ url_for('products') }}" class="shop-now-btn">
+                <i class="bi bi-cart"></i>
+                Browse Products
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.orders-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.orders-header {
+    margin-bottom: 2rem;
+}
+
+.orders-header h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+}
+
+.orders-table-container {
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.orders-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.orders-table th {
+    background: #f9fafb;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 500;
+    color: #4b5563;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.orders-table td {
+    padding: 1.25rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.orders-table tr:last-child td {
+    border-bottom: none;
+}
+
+.label {
+    display: none;
+}
+
+.order-id {
+    font-weight: 500;
+    color: #111827;
+}
+
+.date-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #4b5563;
+}
+
+.date-info i {
+    color: #6b7280;
+}
+
+.time {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.price {
+    font-weight: 500;
+    color: #111827;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge i {
+    font-size: 0.625rem;
+}
+
+.status-badge.pending {
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.status-badge.confirmed {
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.status-badge.shipped {
+    background: #eff6ff;
+    color: #1e40af;
+}
+
+.status-badge.delivered {
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.status-badge.cancelled {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.view-order-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: #2563eb;
+    color: white;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.view-order-btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+.empty-orders {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.empty-orders-content {
+    text-align: center;
+    padding: 2rem;
+}
+
+.empty-orders-content i {
+    font-size: 3rem;
+    color: #9ca3af;
+    margin-bottom: 1rem;
+}
+
+.empty-orders-content h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 0.5rem 0;
+}
+
+.empty-orders-content p {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+}
+
+.shop-now-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2rem;
+    background: #2563eb;
+    color: white;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.shop-now-btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .orders-table thead {
+        display: none;
+    }
+
+    .orders-table, .orders-table tbody, .orders-table tr, .orders-table td {
+        display: block;
+    }
+
+    .orders-table tr {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .orders-table tr:last-child {
+        border-bottom: none;
+    }
+
+    .orders-table td {
+        padding: 0.5rem 0;
+        border: none;
+    }
+
+    .label {
+        display: inline-block;
+        width: 100px;
+        font-weight: 500;
+        color: #6b7280;
+    }
+
+    .order-actions {
+        margin-top: 1rem;
+        text-align: right;
+    }
+}
+</style>
 {% endblock %}

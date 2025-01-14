@@ -1,58 +1,275 @@
-<!-- templates/order_confirmation.html -->
 {% extends "base.html" %}
 
 {% block title %}Order Confirmation{% endblock %}
 
 {% block content %}
-<main>
-    <section>
-        <h2>Thank you for your order!</h2>
-        <p>Your order has been successfully placed. Below are the details of your order.</p>
-    </section>
+<div class="checkout-container">
+    <div class="page-header">
+        <h1>Order Confirmation</h1>
+        <p class="subtitle">Thank you for your purchase!</p>
+    </div>
 
-    <section>
-        <h3>Order Details</h3>
-        <p><strong>Order ID:</strong> {{ order.id }}</p>
-        <p><strong>Total Price:</strong> ${{ order.total_price }}</p>
-        <p><strong>Status:</strong> {{ order.status }}</p>
-        <p><strong>Order Date:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-    </section>
+    <div class="confirmation-grid">
+        <!-- Order Status Card -->
+        <div class="card status-card">
+            <div class="card-header">
+                <h3>Order Status</h3>
+                <div class="secure-badge">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="lock-icon">
+                        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                    </svg>
+                    <span>Order #{{ order.id }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="status-details">
+                    <div class="status-row">
+                        <span class="label">Order Date</span>
+                        <span class="value">{{ order.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Status</span>
+                        <span class="value status-badge">{{ order.status }}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Payment Method</span>
+                        <span class="value">{{ order.payment.payment_method }}</span>
+                    </div>
+                    {% if order.payment.mpesa_transaction_id %}
+                    <div class="status-row">
+                        <span class="label">M-Pesa Transaction ID</span>
+                        <span class="value">{{ order.payment.mpesa_transaction_id }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
 
-    <section>
-        <h3>Order Items</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Quantity</th>
-                    <th>Price</th>
-                    <th>Subtotal</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in order.order_items %}
-                <tr>
-                    <td>{{ item.product.name }}</td>
-                    <td>{{ item.quantity }}</td>
-                    <td>${{ item.price_at_time }}</td>
-                    <td>${{ item.quantity * item.price_at_time }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
+        <!-- Order Items Card -->
+        <div class="card items-card">
+            <div class="card-header">
+                <h3>Order Items</h3>
+                <span class="items-count">{{ order.order_items|length }} items</span>
+            </div>
+            <div class="card-body">
+                <ul class="items-list">
+                    {% for item in order.order_items %}
+                    <li class="item">
+                        <div class="item-image">
+                            <img src="{{ url_for('static', filename='uploads/' + item.product.images[0].image_url) }}"
+                                 alt="{{ item.product.name }}">
+                        </div>
+                        <div class="item-details">
+                            <h4>{{ item.product.name }}</h4>
+                            <div class="item-meta">
+                                <span class="quantity">Qty: {{ item.quantity }}</span>
+                                <span class="item-price">KES {{ "%.2f"|format(item.price_at_time) }}</span>
+                            </div>
+                        </div>
+                        <div class="item-total">
+                            KES {{ "%.2f"|format(item.quantity * item.price_at_time) }}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
 
-    <section>
-        <h3>Payment Information</h3>
-        <p><strong>Payment Method:</strong> {{ order.payment.payment_method }}</p>
-        <p><strong>Payment Status:</strong> {{ order.payment.payment_status }}</p>
-        {% if order.payment.mpesa_transaction_id %}
-        <p><strong>MPESA Transaction ID:</strong> {{ order.payment.mpesa_transaction_id }}</p>
-        {% endif %}
-    </section>
+                <div class="summary-footer">
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <span>KES {{ "%.2f"|format(order.total_price) }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Shipping</span>
+                        <span class="text-success">Free</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total Paid</span>
+                        <span class="total-amount">KES {{ "%.2f"|format(order.total_price) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <section>
-        <a href="{{ url_for('products') }}" class="button">Continue Shopping</a>
-    </section>
-</main>
+        <!-- Continue Shopping Button -->
+        <div class="continue-shopping">
+            <a href="{{ url_for('products') }}" class="continue-button">
+                <span class="button-content">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5z"/>
+                    </svg>
+                    <span>Continue Shopping</span>
+                </span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Inherit existing styles from checkout page */
+.checkout-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    background: #f8fafc;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+    color: #64748b;
+    font-size: 1.125rem;
+    margin: 0;
+}
+
+/* Confirmation specific grid */
+.confirmation-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+/* Status Card Styles */
+.status-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 0.75rem;
+}
+
+.status-row .label {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.status-row .value {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.status-badge {
+    background: #059669;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+}
+
+/* Continue Shopping Button */
+.continue-shopping {
+    grid-column: span 2;
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.continue-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 2rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.continue-button:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+.button-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Inherit remaining styles from checkout page */
+.card {
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+                0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+    .confirmation-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .continue-shopping {
+        grid-column: span 1;
+    }
+
+    .checkout-container {
+        padding: 2rem 1rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .card {
+        border-radius: 1rem;
+    }
+
+    .card-header,
+    .card-body {
+        padding: 1rem;
+    }
+
+    .status-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+</style>
 {% endblock %}

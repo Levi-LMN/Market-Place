@@ -3,23 +3,221 @@
 {% block title %}Products{% endblock %}
 
 {% block content %}
-<h2>Products</h2>
-<ul>
-    {% for product in products %}
-    <li>
-        <a href="{{ url_for('product_detail', product_id=product.id) }}">
-            <h3>{{ product.name }} - KES {{ product.price }}</h3>
-        </a>
-        <p>{{ product.description }}</p>
-        <div>
-            {% for image in product.images %}
-            <img src="{{ url_for('static', filename='uploads/' + image.image_url) }}"
-                 alt="Image of {{ product.name }}"
-                 style="width: 150px; height: auto;">
-            {% endfor %}
+<div class="products-container">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+        <a href="{{ url_for('home') }}">Home</a>
+        <span>/</span>
+        <span class="current">Products</span>
+    </nav>
+
+    <div class="products-header">
+        <h1>Our Products</h1>
+    </div>
+
+    <div class="products-grid">
+        {% for product in products %}
+        <div class="product-card">
+            <div class="product-image">
+                <div class="image-badges">
+                    {% if product.is_new %}
+                        <span class="badge new">New</span>
+                    {% endif %}
+                    {% if product.discount %}
+                        <span class="badge sale">Sale</span>
+                    {% endif %}
+                </div>
+                {% if product.images %}
+                    <img src="{{ url_for('static', filename='uploads/' + product.images[0].image_url) }}"
+                         alt="Image of {{ product.name }}">
+                {% else %}
+                    <div class="no-image">
+                        <i class="bi bi-image"></i>
+                        <p>No image available</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="product-content">
+                <h2 class="product-title">
+                    <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a>
+                </h2>
+
+                <div class="price-section">
+                    {% if product.original_price and product.original_price > product.price %}
+                        <span class="original-price">${{ product.original_price }}</span>
+                    {% endif %}
+                    <span class="current-price">${{ product.price }}</span>
+                </div>
+
+                {% if product.rating %}
+                <div class="rating">
+                    {% for i in range(5) %}
+                        <i class="bi bi-star-fill {% if i < product.rating|int %}filled{% endif %}"></i>
+                    {% endfor %}
+                    <span class="rating-count">({{ product.review_count }})</span>
+                </div>
+                {% endif %}
+
+                <p class="product-description">{{ product.description|truncate(100) }}</p>
+
+                <div class="stock-status {% if product.stock_quantity > 0 %}in-stock{% else %}out-of-stock{% endif %}">
+                    <div class="stock-indicator">
+                        <div class="indicator-dot"></div>
+                        {% if product.stock_quantity > 0 %}
+                            <span>In Stock</span>
+                        {% else %}
+                            <span>Out of Stock</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="product-actions">
+                    <a href="{{ url_for('product_detail', product_id=product.id) }}" class="view-details">
+                        View Details
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
         </div>
-    </li>
-    {% endfor %}
-</ul>
-<p><a href="{{ url_for('home') }}" class="btn btn-secondary">Back to Home</a></p>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+/* Products Page Specific Styles */
+.products-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.products-header {
+    margin-bottom: 2rem;
+}
+
+.products-header h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.product-card {
+    background: white;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.product-image {
+    position: relative;
+    aspect-ratio: 1;
+    background: #f8f9fa;
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-content {
+    padding: 1.5rem;
+}
+
+.product-title {
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.product-title a {
+    color: #111827;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.product-title a:hover {
+    color: #2563eb;
+}
+
+.product-description {
+    color: #6b7280;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 1rem 0;
+}
+
+.product-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.view-details {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: gap 0.2s;
+}
+
+.view-details:hover {
+    gap: 0.75rem;
+}
+
+.no-image {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+}
+
+.no-image i {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.no-image p {
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+/* Reuse existing styles from the product detail page */
+.breadcrumb,
+.image-badges,
+.badge,
+.price-section,
+.original-price,
+.current-price,
+.rating,
+.stock-status,
+.stock-indicator,
+.indicator-dot {
+    /* These styles are already defined in the product detail page */
+}
+</style>
 {% endblock %}

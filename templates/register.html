@@ -1,30 +1,282 @@
 {% extends 'base.html' %}
 
-{% block title %}
-Register
-{% endblock %}
+{% block title %}Register{% endblock %}
 
 {% block content %}
-<h2>Register</h2>
-<form method="POST">
-    {{ form.hidden_tag() }}
-    <div>
-        <label for="name">Name</label>
-        {{ form.name(class="form-control") }}
+<div class="checkout-container">
+    <div class="page-header">
+        <h1>Create Account</h1>
+        <p class="subtitle">Join us to start shopping</p>
     </div>
-    <div>
-        <label for="email">Email</label>
-        {{ form.email(class="form-control") }}
+
+    <div class="auth-container">
+        <div class="card auth-card">
+            <div class="card-header">
+                <h3>Register</h3>
+                <div class="secure-badge">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="lock-icon">
+                        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                    </svg>
+                    <span>Secure Registration</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="auth-form">
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <div class="input-wrapper">
+                            {{ form.name(class="form-control", placeholder="Enter your full name") }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <div class="input-wrapper">
+                            {{ form.email(class="form-control", placeholder="Enter your email") }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-wrapper">
+                            {{ form.password(class="form-control", placeholder="Choose a strong password") }}
+                        </div>
+                        <small class="helper-text">Use at least 8 characters with letters and numbers</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone_number">Phone Number</label>
+                        <div class="input-wrapper">
+                            <span class="prefix">+254</span>
+                            {{ form.phone_number(class="form-control", placeholder="7XX XXX XXX") }}
+                        </div>
+                        <small class="helper-text">Enter your M-Pesa registered number</small>
+                    </div>
+
+                    <button type="submit" class="auth-button">
+                        <span class="button-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 1.5a3.5 3.5 0 0 0-3.5 3.5v.5h7v-.5A3.5 3.5 0 0 0 8 1.5zm-4 4V5H1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5h-3v.5a.5.5 0 0 1-1 0V5H5v.5a.5.5 0 0 1-1 0z"/>
+                            </svg>
+                            <span>Create Account</span>
+                        </span>
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="{{ url_for('login') }}" class="auth-link">Login here</a></p>
+                </div>
+            </div>
+        </div>
     </div>
-    <div>
-        <label for="password">Password</label>
-        {{ form.password(class="form-control") }}
-    </div>
-    <div>
-        <label for="phone_number">Phone Number</label>
-        {{ form.phone_number(class="form-control") }}
-    </div>
-    <button type="submit" class="btn btn-primary">Register</button>
-</form>
-<p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+</div>
+
+<style>
+/* Inherit existing container styles */
+.checkout-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    background: #f8fafc;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+    color: #64748b;
+    font-size: 1.125rem;
+    margin: 0;
+}
+
+/* Auth Container */
+.auth-container {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* Card Styles */
+.card {
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+                0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+/* Form Styles */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #0f172a;
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    border-radius: 1rem;
+    border: 2px solid #e2e8f0;
+    transition: all 0.2s;
+}
+
+.input-wrapper:focus-within {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.prefix {
+    padding: 0.75rem 1rem;
+    color: #64748b;
+    font-weight: 500;
+    border-right: 2px solid #e2e8f0;
+}
+
+.form-control {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    color: #0f172a;
+    width: 100%;
+}
+
+.form-control:focus {
+    outline: none;
+}
+
+.helper-text {
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+/* Auth Button */
+.auth-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 1rem 1.5rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 1rem;
+}
+
+.auth-button:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+.button-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Auth Footer */
+.auth-footer {
+    margin-top: 2rem;
+    text-align: center;
+    color: #64748b;
+}
+
+.auth-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+/* Secure Badge */
+.secure-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #059669;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.lock-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+    .checkout-container {
+        padding: 2rem 1rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+    }
+
+    .card {
+        border-radius: 1rem;
+    }
+
+    .card-header,
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .input-wrapper {
+        flex-direction: row;
+    }
+}
+</style>
 {% endblock %}
