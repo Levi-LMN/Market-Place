@@ -754,7 +754,6 @@ def check_pending_payments():
             time.sleep(30)
 
 
-# Modify the check_payment_status route
 @app.route('/check_payment_status/<checkout_request_id>')
 def check_payment_status(checkout_request_id):
     try:
@@ -766,10 +765,18 @@ def check_payment_status(checkout_request_id):
             }), 404
 
         if payment.payment_status == "Completed" and payment.mpesa_transaction_id:
-            # Clear cart only if not already processed
+            # Clear cart if payment is completed
             order = Order.query.get(payment.order_id)
             if order and order.status == "Pending":
                 order.status = "Processing"
+
+                # Create a new empty cart order for the user
+                new_cart = Order(
+                    user_id=order.user_id,
+                    total_price=0,
+                    status="Pending"
+                )
+                db.session.add(new_cart)
                 db.session.commit()
 
             return jsonify({
@@ -791,10 +798,18 @@ def check_payment_status(checkout_request_id):
             payment.payment_status = "Completed"
             payment.mpesa_transaction_id = mpesa_status.get('MpesaReceiptNumber')
 
-            # Update order status
+            # Update order status and clear cart
             order = Order.query.get(payment.order_id)
             if order:
                 order.status = "Processing"
+
+                # Create a new empty cart order for the user
+                new_cart = Order(
+                    user_id=order.user_id,
+                    total_price=0,
+                    status="Pending"
+                )
+                db.session.add(new_cart)
 
             db.session.commit()
 
@@ -817,7 +832,6 @@ def check_payment_status(checkout_request_id):
         }), 500
 
 
-# Modify the mpesa_callback route
 @app.route('/mpesa_callback', methods=['POST'])
 def mpesa_callback():
     try:
@@ -847,10 +861,18 @@ def mpesa_callback():
                 payment.payment_status = "Completed"
                 payment.mpesa_transaction_id = mpesa_receipt_number
 
-                # Update order status if not already processed
+                # Update order status and clear cart
                 order = Order.query.get(payment.order_id)
                 if order and order.status == "Pending":
                     order.status = "Processing"
+
+                    # Create a new empty cart order for the user
+                    new_cart = Order(
+                        user_id=order.user_id,
+                        total_price=0,
+                        status="Pending"
+                    )
+                    db.session.add(new_cart)
 
                 db.session.commit()
                 print(f"Payment updated with transaction ID: {mpesa_receipt_number}")
@@ -864,6 +886,7 @@ def mpesa_callback():
     except Exception as e:
         print(f"Error in callback: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/initiate_payment', methods=['POST'])
 def initiate_payment():
@@ -1003,6 +1026,7 @@ def update_quantity(order_item_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
 
 
 # Add this at the bottom of your file, just before app.run()
