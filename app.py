@@ -33,9 +33,7 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///store.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_ENABLED'] = True
-# Add this configuration after your other app configs
-NGROK_URL = None  # This will be updated when you start your application
-
+SITE_URL = 'https://levishub.pythonanywhere.com'
 db = SQLAlchemy(app)
 
 
@@ -900,14 +898,12 @@ def initiate_payment():
 
         # Check if payment already exists
         if order.payment:
-            # If payment exists and is pending, return existing checkout request ID
             if order.payment.payment_status == "Pending":
                 return jsonify({
                     'success': True,
                     'message': 'Payment already initiated. Please check your phone.',
                     'checkout_request_id': order.payment.checkout_request_id
                 })
-            # If payment exists but failed, delete it to create new one
             db.session.delete(order.payment)
             db.session.commit()
 
@@ -928,7 +924,6 @@ def initiate_payment():
 
         amount = int(order.total_price)
 
-        # Create new payment record
         payment = Payment(
             order_id=order.id,
             payment_method="MPESA",
@@ -940,7 +935,8 @@ def initiate_payment():
 
         try:
             mpesa = LipaNaMpesaOnline()
-            callback_url = urljoin(NGROK_URL, '/mpesa_callback')
+            # Use PythonAnywhere URL for callback
+            callback_url = f"{SITE_URL}/mpesa_callback"
             print(f"Initiating payment for order {order.id} with callback URL: {callback_url}")
 
             response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
@@ -968,7 +964,6 @@ def initiate_payment():
             'success': False,
             'message': f'Payment initiation failed: {str(e)}'
         }), 500
-
 
 
 
@@ -1029,7 +1024,6 @@ def update_quantity(order_item_id):
 
 
 
-# Add this at the bottom of your file, just before app.run()
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -1043,19 +1037,4 @@ if __name__ == '__main__':
             db.session.add(Role(name='customer'))
         db.session.commit()
 
-    # Check if ngrok is running and get the public URL
-    try:
-        ngrok_api_response = requests.get('http://localhost:4040/api/tunnels')
-        tunnels = ngrok_api_response.json()['tunnels']
-        NGROK_URL = [t['public_url'] for t in tunnels if t['public_url'].startswith('https')][0]
-        print(f"\nNgrok tunnel established at: {NGROK_URL}")
-    except Exception as e:
-        print("\nError: Ngrok is not running. Please start ngrok first.")
-        print("Follow these steps to set up ngrok:")
-        print("1. Download ngrok from https://ngrok.com/download")
-        print("2. Extract the downloaded file")
-        print("3. Open a new terminal and navigate to the ngrok folder")
-        print("4. Run: ngrok http 5000")
-        sys.exit(1)
-
-    app.run(debug=True)
+    app.run(debug=False)  # Set debug to False for production
