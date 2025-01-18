@@ -70,9 +70,9 @@
 
                 <div class="price-section">
                     {% if product.original_price and product.original_price > product.price %}
-                        <span class="original-price">${{ product.original_price }}</span>
+                        <span class="original-price">KES {{ product.original_price }}</span>
                     {% endif %}
-                    <span class="current-price">${{ product.price }}</span>
+                    <span class="current-price">KES {{ product.price }}</span>
                 </div>
 
                 <p class="product-description">{{ product.description|truncate(100) }}</p>
