@@ -8,27 +8,33 @@
 
         <div class="mb-3">
             {{ form.name.label(class="form-label") }}
-            {{ form.name(class="form-control", value=product.name) }}
+            {{ form.name(class="form-control") }}
         </div>
 
         <div class="mb-3">
             {{ form.description.label(class="form-label") }}
-            {{ form.description(class="form-control", value=product.description) }}
+            {{ form.description(class="form-control") }}
         </div>
 
         <div class="mb-3">
             {{ form.category.label(class="form-label") }}
-            {{ form.category(class="form-control") }}
+            <select name="category" id="category" class="form-control">
+                {% for choice in form.category.choices %}
+                <option value="{{ choice[0] }}" {% if choice[0] == product.category_id %}selected{% endif %}>
+                    {{ choice[1] }}
+                </option>
+                {% endfor %}
+            </select>
         </div>
 
         <div class="mb-3">
             {{ form.price.label(class="form-label") }}
-            {{ form.price(class="form-control", value=product.price) }}
+            {{ form.price(class="form-control") }}
         </div>
 
         <div class="mb-3">
             {{ form.stock_quantity.label(class="form-label") }}
-            {{ form.stock_quantity(class="form-control", value=product.stock_quantity) }}
+            {{ form.stock_quantity(class="form-control") }}
         </div>
 
         {% if product.images %}

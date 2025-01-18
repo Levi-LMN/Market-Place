@@ -134,10 +134,10 @@ class ProductForm(FlaskForm):
     description = StringField('Description', validators=[DataRequired()])
     price = StringField('Price', validators=[DataRequired()])
     stock_quantity = StringField('Stock Quantity', validators=[DataRequired()])
+    # Using coerce=int to ensure category ID is handled as integer
     category = SelectField('Category', coerce=int, validators=[DataRequired()])
     images = FileField('Images', validators=[FileAllowed(['jpg', 'png', 'jpeg'])])
     submit = SubmitField('Submit')
-
 
 # Forms
 class RegistrationForm(FlaskForm):
@@ -486,57 +486,80 @@ def add_product():
 @app.route('/product/<int:product_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def edit_product(product_id):
+    # Get the product and all categories
     product = Product.query.get_or_404(product_id)
-    form = ProductForm(obj=product)
-    form.category.choices = [(c.id, c.name) for c in Category.query.all()]
-    form.category.data = product.category_id
+    categories = Category.query.all()
+
+    # Initialize form
+    form = ProductForm()
+
+    # Set the category choices
+    form.category.choices = [(cat.id, cat.name) for cat in categories]
+
+    if request.method == 'GET':
+        # Pre-populate the form with existing data
+        form.name.data = product.name
+        form.description.data = product.description
+        form.price.data = str(product.price)
+        form.stock_quantity.data = str(product.stock_quantity)
+        form.category.data = product.category_id
 
     if form.validate_on_submit():
-        product.name = form.name.data
-        product.description = form.description.data
-        product.price = float(form.price.data)
-        product.stock_quantity = int(form.stock_quantity.data)
-        product.category_id = form.category.data
-
-        # Handle image deletion
-        if 'delete_images' in request.form:
-            for image_id in request.form.getlist('delete_images'):
-                image = ProductImage.query.get(int(image_id))
-                if image:
-                    try:
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], image.image_url)
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
-                        db.session.delete(image)
-                    except Exception as e:
-                        print(f"Error deleting image: {e}")
-
-        # Handle new image uploads
-        if form.images.data:
-            for image in request.files.getlist('images'):
-                if image.filename:
-                    filename = secure_filename(image.filename)
-                    image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                    image.save(image_path)
-
-                    product_image = ProductImage(
-                        product_id=product.id,
-                        image_url=filename
-                    )
-                    db.session.add(product_image)
-
         try:
+            # Update product fields
+            product.name = form.name.data
+            product.description = form.description.data
+            product.price = float(form.price.data)
+            product.stock_quantity = int(form.stock_quantity.data)
+
+            # Get the selected category and update the relationship
+            selected_category = Category.query.get(form.category.data)
+            if selected_category is None:
+                flash('Selected category does not exist.', 'danger')
+                return redirect(url_for('edit_product', product_id=product_id))
+
+            product.category_id = selected_category.id
+
+            # Handle image deletion
+            if 'delete_images' in request.form:
+                for image_id in request.form.getlist('delete_images'):
+                    image = ProductImage.query.get(int(image_id))
+                    if image and image.product_id == product.id:  # Security check
+                        try:
+                            file_path = os.path.join(app.config['UPLOAD_FOLDER'], image.image_url)
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                            db.session.delete(image)
+                        except Exception as e:
+                            print(f"Error deleting image: {e}")
+
+            # Handle new image uploads
+            if form.images.data:
+                for image in request.files.getlist('images'):
+                    if image.filename:
+                        filename = secure_filename(image.filename)
+                        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                        image.save(image_path)
+
+                        product_image = ProductImage(
+                            product_id=product.id,
+                            image_url=filename
+                        )
+                        db.session.add(product_image)
+
+            # Commit all changes
             db.session.commit()
             flash('Product updated successfully!', 'success')
             return redirect(url_for('manage_products'))
+
         except Exception as e:
             db.session.rollback()
             flash('Error updating product.', 'danger')
             print(f"Database error: {e}")
 
+    # Pass both form and product to template
     return render_template('edit_product.html', form=form, product=product)
-
 
 @app.route('/admin/delete_product/<int:product_id>', methods=['POST'])
 @admin_required
