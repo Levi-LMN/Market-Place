@@ -763,6 +763,9 @@ def checkout():
 
 # Add to routes
 
+from datetime import datetime
+
+
 @app.route('/admin/manage_orders', methods=['GET'])
 @admin_required
 def manage_orders():
@@ -777,16 +780,29 @@ def manage_orders():
     # Apply filters
     if status:
         query = query.filter(Order.status == status)
+
+    # Apply start date filter if valid
     if start_date:
-        query = query.filter(Order.created_at >= datetime.strptime(start_date, '%Y-%m-%d'))
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Order.created_at >= start_date)
+        except ValueError:
+            # Invalid date format, handle the error or log it
+            flash("Invalid start date format. Please use YYYY-MM-DD.", "danger")
+
+    # Apply end date filter if valid
     if end_date:
-        query = query.filter(Order.created_at <= datetime.strptime(end_date, '%Y-%m-%d'))
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            query = query.filter(Order.created_at <= end_date)
+        except ValueError:
+            # Invalid date format, handle the error or log it
+            flash("Invalid end date format. Please use YYYY-MM-DD.", "danger")
 
     # Fetch filtered orders
     orders = query.order_by(Order.created_at.desc()).all()
 
     return render_template('manage_orders.html', orders=orders)
-
 
 
 @app.route('/admin/update_order_status/<int:order_id>', methods=['POST'])
