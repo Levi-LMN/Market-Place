@@ -34,8 +34,9 @@
 
         <div class="mb-3">
             {{ form.images.label(class="form-label") }}
-            {{ form.images(class="form-control") }}
+            <input type="file" name="images" class="form-control" multiple>
         </div>
+
 
         {{ form.submit(class="btn btn-primary") }}
         <a href="{{ url_for('manage_products') }}" class="btn btn-secondary">Cancel</a>

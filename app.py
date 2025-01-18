@@ -439,7 +439,6 @@ def delete_category(category_id):
     return redirect(url_for('manage_categories'))
 
 
-# Update the add_product and edit_product routes
 @app.route('/admin/add_product', methods=['GET', 'POST'])
 @admin_required
 def add_product():
@@ -457,18 +456,25 @@ def add_product():
         db.session.add(product)
         db.session.commit()
 
+        # Handling multiple images
         if form.images.data:
             for image in request.files.getlist('images'):
                 filename = secure_filename(image.filename)
                 image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+                # Ensure the directory exists before saving
                 os.makedirs(os.path.dirname(image_path), exist_ok=True)
+
+                # Save the image
                 image.save(image_path)
 
+                # Create a new ProductImage entry for each image
                 product_image = ProductImage(
                     product_id=product.id,
                     image_url=filename
                 )
                 db.session.add(product_image)
+
             db.session.commit()
 
         flash('Product added successfully!', 'success')
@@ -492,6 +498,7 @@ def edit_product(product_id):
         product.stock_quantity = int(form.stock_quantity.data)
         product.category_id = form.category.data
 
+        # Handle image deletion
         if 'delete_images' in request.form:
             for image_id in request.form.getlist('delete_images'):
                 image = ProductImage.query.get(int(image_id))
@@ -504,6 +511,7 @@ def edit_product(product_id):
                     except Exception as e:
                         print(f"Error deleting image: {e}")
 
+        # Handle new image uploads
         if form.images.data:
             for image in request.files.getlist('images'):
                 if image.filename:
