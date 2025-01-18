@@ -541,28 +541,38 @@ def edit_product(product_id):
 @app.route('/admin/delete_product/<int:product_id>', methods=['POST'])
 @admin_required
 def delete_product(product_id):
-    product = Product.query.get_or_404(product_id)
-
-    # Delete associated images
-    for image in product.images:
-        try:
-            file_path = os.path.join(app.root_path, image.image_url)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        except Exception as e:
-            print(f"Error deleting image file: {e}")
-
     try:
+        product = Product.query.get_or_404(product_id)
+
+        # First delete all associated product images
+        for image in product.images:
+            try:
+                # Delete physical image file
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], image.image_url)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+
+                # Delete image record from database
+                db.session.delete(image)
+            except Exception as e:
+                print(f"Error deleting image {image.id}: {e}")
+                # Continue with other images even if one fails
+                continue
+
+        # Delete any order items associated with this product
+        OrderItem.query.filter_by(product_id=product_id).delete()
+
+        # Finally delete the product
         db.session.delete(product)
         db.session.commit()
-        flash('Product deleted successfully!', 'success')
+
+        flash('Product and all associated images deleted successfully!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash('Error deleting product.', 'danger')
-        print(f"Database error: {e}")
+        print(f"Error deleting product {product_id}: {e}")
+        flash('Error deleting product. Please try again.', 'danger')
 
     return redirect(url_for('manage_products'))
-
 
 @app.route('/cart')
 def view_cart():

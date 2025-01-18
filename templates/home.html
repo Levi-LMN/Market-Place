@@ -18,10 +18,16 @@
     transform: translateY(10px);
     transition: all 0.3s ease;
   }
+  @media (max-width: 640px) {
+    .add-to-cart {
+      opacity: 1;
+      transform: none;
+    }
+  }
 </style>
 
-<!-- Hero Section with Enhanced Visual Appeal -->
-<div class="relative bg-cover bg-center text-white overflow-hidden rounded-lg shadow-lg" style="background-image: url('https://www.zoomshoes.in/cdn/shop/articles/Zoom-Blog-for-Lace-up-shoes-Banner_1100x.jpg?v=1708950474');">
+<!-- Hero Section -->
+<div class="relative bg-cover bg-center text-white overflow-hidden rounded-lg shadow-lg min-h-[300px] md:min-h-[500px]" style="background-image: url('https://www.zoomshoes.in/cdn/shop/articles/Zoom-Blog-for-Lace-up-shoes-Banner_1100x.jpg?v=1708950474');">
     <!-- Blur Background -->
     <div class="absolute inset-0 rounded-lg" style="
         background-image: url('https://www.zoomshoes.in/cdn/shop/articles/Zoom-Blog-for-Lace-up-shoes-Banner_1100x.jpg?v=1708950474');
@@ -35,16 +41,16 @@
     <!-- Dark Overlay -->
     <div class="absolute inset-0 bg-black opacity-50 rounded-lg"></div>
 
-    <div class="relative py-24 px-4 sm:px-6 lg:px-8">
+    <div class="relative py-12 md:py-24 px-4 sm:px-6 lg:px-8">
         <div class="max-w-3xl mx-auto text-center">
-            <h1 class="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
+            <h1 class="text-3xl md:text-5xl lg:text-6xl font-extrabold mb-4 md:mb-6 leading-tight">
                 Welcome to LevisStore
-                <span class="block text-2xl md:text-3xl font-medium mt-2 text-purple-200">Where Quality Meets Style</span>
+                <span class="block text-xl md:text-2xl lg:text-3xl font-medium mt-2 text-purple-200">Where Quality Meets Style</span>
             </h1>
-            <p class="text-xl mb-10 leading-relaxed text-purple-100">Discover curated collections and exclusive deals on premium products</p>
-            <a href="{{ url_for('products') }}" class="inline-flex items-center bg-white text-purple-600 px-8 py-4 rounded-full font-semibold shadow-lg hover:shadow-xl hover:bg-gray-100 transition duration-300 transform hover:-translate-y-1">
+            <p class="text-lg md:text-xl mb-6 md:mb-10 leading-relaxed text-purple-100 px-4">Discover curated collections and exclusive deals on premium products</p>
+            <a href="{{ url_for('products') }}" class="inline-flex items-center bg-white text-purple-600 px-6 md:px-8 py-3 md:py-4 rounded-full font-semibold shadow-lg hover:shadow-xl hover:bg-gray-100 transition duration-300 transform hover:-translate-y-1 text-sm md:text-base">
                 Shop Now
-                <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="ml-2 w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
                 </svg>
             </a>
@@ -52,28 +58,25 @@
     </div>
 </div>
 
-
-
-<!-- Categories Section with Improved Cards -->
-<div class="py-20 bg-gray-50">
+<!-- Categories Section -->
+<div class="py-12 md:py-20 bg-gray-50">
     <div class="container mx-auto px-4">
-        <h2 class="text-4xl font-extrabold text-center mb-16 text-gray-800">
+        <h2 class="text-3xl md:text-4xl font-extrabold text-center mb-8 md:mb-16 text-gray-800">
             <span class="block text-sm font-semibold text-purple-600 mb-2">EXPLORE</span>
             Shop by Category
         </h2>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
             {% for category in categories %}
             <a href="{{ url_for('products', category_id=category.id) }}" class="group">
-                <div class="bg-white rounded-xl shadow-md overflow-hidden transition duration-300 transform hover:-translate-y-2 hover:shadow-xl">
-                    <div class="p-8 text-center">
-                        <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <!-- Add category-specific icons here -->
-                            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="bg-white rounded-xl shadow-md overflow-hidden transition duration-300 transform hover:-translate-y-2 hover:shadow-xl p-4 md:p-8">
+                    <div class="text-center">
+                        <div class="w-12 h-12 md:w-16 md:h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-6 h-6 md:w-8 md:h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                             </svg>
                         </div>
-                        <h3 class="text-xl font-bold text-gray-800 mb-3">{{ category.name }}</h3>
-                        <p class="text-gray-600 line-clamp-2">{{ category.description[:100] }}...</p>
+                        <h3 class="text-base md:text-xl font-bold text-gray-800">{{ category.name }}</h3>
+                        <p class="hidden md:block text-sm md:text-base text-gray-600 mt-2 line-clamp-2">{{ category.description[:100] }}...</p>
                     </div>
                 </div>
             </a>
@@ -82,14 +85,15 @@
     </div>
 </div>
 
-<!-- Featured Products Section with Enhanced Cards -->
-<div class="py-20">
+
+<!-- Featured Products Section -->
+<div class="py-12 md:py-20">
     <div class="container mx-auto px-4">
-        <h2 class="text-4xl font-extrabold text-center mb-16 text-gray-800">
+        <h2 class="text-3xl md:text-4xl font-extrabold text-center mb-8 md:mb-16 text-gray-800">
             <span class="block text-sm font-semibold text-purple-600 mb-2">FEATURED</span>
             Top Products
         </h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
             {% for product in products %}
             <div class="product-card bg-white rounded-xl shadow-md overflow-hidden group relative">
                 <a href="{{ url_for('product_detail', product_id=product.id) }}">
@@ -101,26 +105,26 @@
                     </div>
                     {% else %}
                     <div class="aspect-w-1 aspect-h-1 w-full bg-gray-100 flex items-center justify-center">
-                        <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-8 h-8 md:w-12 md:h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
                     </div>
                     {% endif %}
-                    <div class="p-6">
+                    <div class="p-4 md:p-6">
                         {% if product.is_new %}
-                        <span class="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">New</span>
+                        <span class="absolute top-2 right-2 md:top-4 md:right-4 bg-green-500 text-white px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium">New</span>
                         {% endif %}
-                        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ product.name }}</h3>
-                        <p class="text-gray-600 mb-4 line-clamp-2">{{ product.description }}</p>
+                        <h3 class="text-base md:text-lg font-bold text-gray-800 mb-2">{{ product.name }}</h3>
+                        <p class="text-sm md:text-base text-gray-600 mb-4 line-clamp-2">{{ product.description }}</p>
                         <div class="flex items-center justify-between">
-                            <span class="text-2xl font-bold text-purple-600">KSH {{ "%.2f"|format(product.price) }}</span>
+                            <span class="text-xl md:text-2xl font-bold text-purple-600">KSH {{ "%.2f"|format(product.price) }}</span>
                         </div>
                     </div>
                 </a>
-                <div class="px-6 pb-6">
+                <div class="px-4 md:px-6 pb-4 md:pb-6">
                     <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST">
-                        <button type="submit" class="add-to-cart w-full bg-purple-600 text-white py-3 rounded-lg shadow-md hover:bg-purple-700 transition duration-300 flex items-center justify-center space-x-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button type="submit" class="add-to-cart w-full bg-purple-600 text-white py-2 md:py-3 rounded-lg shadow-md hover:bg-purple-700 transition duration-300 flex items-center justify-center space-x-2 text-sm md:text-base">
+                            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                             </svg>
                             <span>Add to Cart</span>
@@ -133,56 +137,57 @@
     </div>
 </div>
 
-<!-- Features Section with Animated Icons -->
-<div class="bg-gray-50 py-20">
+<!-- Features Section -->
+<div class="bg-gray-50 py-12 md:py-20">
     <div class="container mx-auto px-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
             <div class="text-center">
-                <div class="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 transform transition duration-500 hover:rotate-12">
-                    <svg class="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="bg-purple-100 w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 transform transition duration-500 hover:rotate-12">
+                    <svg class="w-8 h-8 md:w-10 md:h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
                 </div>
-                <h3 class="text-2xl font-bold mb-4">Premium Quality</h3>
-                <p class="text-gray-600 leading-relaxed">Carefully curated products that meet our high standards</p>
+                <h3 class="text-xl md:text-2xl font-bold mb-2 md:mb-4">Premium Quality</h3>
+                <p class="text-sm md:text-base text-gray-600 leading-relaxed">Carefully curated products that meet our high standards</p>
             </div>
             <div class="text-center">
-                <div class="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 transform transition duration-500 hover:rotate-12">
-                    <svg class="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="bg-purple-100 w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 transform transition duration-500 hover:rotate-12">
+                    <svg class="w-8 h-8 md:w-10 md:h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                 </div>
-                <h3 class="text-2xl font-bold mb-4">Unbeatable Prices</h3>
-                <p class="text-gray-600 leading-relaxed">Best value for your money, guaranteed</p>
+                <h3 class="text-xl md:text-2xl font-bold mb-2 md:mb-4">Unbeatable Prices</h3>
+                <p class="text-sm md:text-base text-gray-600 leading-relaxed">Best value for your money, guaranteed</p>
             </div>
             <div class="text-center">
-                <div class="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 transform transition duration-500 hover:rotate-12">
-                    <svg class="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="bg-purple-100 w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 transform transition duration-500 hover:rotate-12">
+                    <svg class="w-8 h-8 md:w-10 md:h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
                 </div>
-                <h3 class="text-2xl font-bold mb-4">Express Delivery</h3>
-                <p class="text-gray-600 leading-relaxed">Swift and secure shipping to your doorstep</p>
+                <h3 class="text-xl md:text-2xl font-bold mb-2 md:mb-4">Express Delivery</h3>
+                <p class="text-sm md:text-base text-gray-600 leading-relaxed">Swift and secure shipping to your doorstep</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Newsletter Section with Enhanced Design -->
-<div class="py-20 bg-white">
+<!-- Newsletter Section -->
+<div class="py-12 md:py-20 bg-white">
     <div class="container mx-auto px-4">
         <div class="max-w-2xl mx-auto text-center">
-            <h2 class="text-4xl font-extrabold mb-6 text-gray-800">Stay in the Loop</h2>
-            <p class="text-gray-600 mb-8 text-lg">Subscribe to our newsletter for exclusive offers and new arrivals</p>
+            <h2 class="text-3xl md:text-4xl font-extrabold mb-4 md:mb-6 text-gray-800">Stay in the Loop</h2>
+            <p class="text-base md:text-lg text-gray-600 mb-6 md:mb-8">Subscribe to our newsletter for exclusive offers and new arrivals</p>
             <form class="flex flex-col sm:flex-row gap-4">
                 <input type="email"
                        placeholder="Enter your email"
-                       class="flex-1 px-6 py-4 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-gray-800 placeholder-gray-400">
+                       class="flex-1 px-4 md:px-6 py-3 md:py-4 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-gray-800 placeholder-gray-400 text-sm md:text-base">
                 <button type="submit"
-                        class="px-8 py-4 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:-translate-y-1 font-semibold">
+                        class="px-6 md:px-8 py-3 md:py-4 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:-translate-y-1 font-semibold text-sm md:text-base">
                     Subscribe Now
                 </button>
             </form>
+            <p class="mt-4 text-xs text-gray-500">By subscribing, you agree to our Privacy Policy and Terms of Service</p>
         </div>
     </div>
 </div>
