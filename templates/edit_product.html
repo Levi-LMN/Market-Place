@@ -1,3 +1,4 @@
+{# templates/edit_product.html #}
 {% extends 'base.html' %}
 
 {% block content %}
@@ -17,6 +18,11 @@
         </div>
 
         <div class="mb-3">
+            {{ form.category.label(class="form-label") }}
+            {{ form.category(class="form-control") }}
+        </div>
+
+        <div class="mb-3">
             {{ form.price.label(class="form-label") }}
             {{ form.price(class="form-control", value=product.price) }}
         </div>
@@ -27,38 +33,54 @@
         </div>
 
         {% if product.images %}
-<div class="mb-3">
-    <label class="form-label">Current Images</label>
-    <div class="row">
-        {% for image in product.images %}
-        <div class="col-md-3 mb-3">
-            <div class="card">
-                <img src="{{ url_for('static', filename='uploads/' + image.image_url) }}"
-                     class="card-img-top"
-                     alt="Product image">
-                <div class="card-body">
-                    <div class="form-check">
-                        <input type="checkbox"
-                               class="form-check-input"
-                               name="delete_images"
-                               value="{{ image.id }}">
-                        <label class="form-check-label">Delete</label>
+        <div class="mb-3">
+            <label class="form-label">Current Images</label>
+            <div class="row">
+                {% for image in product.images %}
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <img src="{{ url_for('static', filename='uploads/' + image.image_url) }}"
+                             class="card-img-top"
+                             alt="Product image">
+                        <div class="card-body">
+                            <div class="form-check">
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       name="delete_images"
+                                       value="{{ image.id }}">
+                                <label class="form-check-label">Delete</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
         </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
+        {% endif %}
 
         <div class="mb-3">
             {{ form.images.label(class="form-label") }}
             {{ form.images(class="form-control") }}
         </div>
 
+
         {{ form.submit(class="btn btn-primary") }}
         <a href="{{ url_for('manage_products') }}" class="btn btn-secondary">Cancel</a>
     </form>
 </div>
 {% endblock %}
+
+{# Update templates/base.html - Add category management to admin menu #}
+{% if session.get('user_role') == 'admin' %}
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Admin
+    </a>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{{ url_for('manage_products') }}">Manage Products</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('manage_categories') }}">Manage Categories</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('manage_users') }}">Manage Users</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('manage_orders') }}">Manage Orders</a></li>
+    </ul>
+</li>
+{% endif %}

@@ -63,16 +63,6 @@ class ProductImage(db.Model):
     image_url = db.Column(db.String(200), nullable=False)
 
 
-class Product(db.Model):
-    __tablename__ = 'products'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.String(500), nullable=True)
-    price = db.Column(db.Float, nullable=False)
-    stock_quantity = db.Column(db.Integer, nullable=False)
-    order_items = db.relationship('OrderItem', backref='product', lazy=True)
-    images = db.relationship('ProductImage', backref='product', lazy=True)
-
 
 # Update the Order model relationship with Payment
 class Order(db.Model):
@@ -108,6 +98,47 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())  # Added timestamp
     updated_at = db.Column(db.DateTime, onupdate=db.func.current_timestamp())  # Added update timestamp
 
+
+# Add the Category model after your existing models
+class Category(db.Model):
+    __tablename__ = 'categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.String(500))
+    products = db.relationship('Product', backref='category', lazy=True)
+
+
+# Update the Product model to include category
+class Product(db.Model):
+    __tablename__ = 'products'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500), nullable=True)
+    price = db.Column(db.Float, nullable=False)
+    stock_quantity = db.Column(db.Integer, nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
+    order_items = db.relationship('OrderItem', backref='product', lazy=True)
+    images = db.relationship('ProductImage', backref='product', lazy=True)
+
+
+# Add CategoryForm for managing categories
+class CategoryForm(FlaskForm):
+    name = StringField('Name', validators=[DataRequired()])
+    description = StringField('Description')
+    submit = SubmitField('Submit')
+
+
+# Update ProductForm to include category selection
+class ProductForm(FlaskForm):
+    name = StringField('Name', validators=[DataRequired()])
+    description = StringField('Description', validators=[DataRequired()])
+    price = StringField('Price', validators=[DataRequired()])
+    stock_quantity = StringField('Stock Quantity', validators=[DataRequired()])
+    category = SelectField('Category', coerce=int, validators=[DataRequired()])
+    images = FileField('Images', validators=[FileAllowed(['jpg', 'png', 'jpeg'])])
+    submit = SubmitField('Submit')
+
+
 # Forms
 class RegistrationForm(FlaskForm):
     name = StringField('Name', validators=[DataRequired()])
@@ -130,14 +161,6 @@ class EditUserForm(FlaskForm):
     role = SelectField('Role', coerce=int, choices=[])
     submit = SubmitField('Update')
 
-
-class ProductForm(FlaskForm):
-    name = StringField('Name', validators=[DataRequired()])
-    description = StringField('Description', validators=[DataRequired()])
-    price = StringField('Price', validators=[DataRequired()])
-    stock_quantity = StringField('Stock Quantity', validators=[DataRequired()])
-    images = FileField('Images', validators=[FileAllowed(['jpg', 'png', 'jpeg'])])
-    submit = SubmitField('Submit')
 
 
 from flask import Flask, jsonify, request
@@ -234,7 +257,33 @@ def admin_required(f):
 # Routes
 @app.route('/')
 def home():
-    return render_template('home.html')
+    # Get all categories for the browse section
+    categories = Category.query.all()
+
+    # Get featured products (for this example, we'll get the 8 most recent products)
+    products = Product.query.order_by(Product.id.desc()).limit(8).all()
+
+    # Add flags for new and discounted products
+    for product in products:
+        # Mark products as new if they have an id in the latest 20% of all products
+        total_products = Product.query.count()
+        new_threshold = int(total_products * 0.8)  # Latest 20% are considered new
+        product.is_new = product.id > new_threshold
+
+        # Check if product has a discount by comparing current price with original price
+        # This assumes you add an original_price field to your Product model
+        # For now, we'll set discount flag to False as original_price isn't in the model
+        product.discount = False
+
+        # If you want to add original_price to your model, add this to your Product class:
+        # original_price = db.Column(db.Float, nullable=True)
+        # Then you can uncomment this logic:
+        # product.discount = product.original_price and product.original_price > product.price
+
+    return render_template('home.html',
+                           categories=categories,
+                           products=products)
+
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -289,10 +338,26 @@ def logout():
 
 @app.route('/products')
 def products():
-    products = Product.query.all()
-    return render_template('products.html', products=products)
+    # Get category filter from query parameters
+    category_id = request.args.get('category_id', type=int)
+    selected_category = None
 
+    # Query products based on category
+    if category_id:
+        selected_category = Category.query.get_or_404(category_id)
+        products = Product.query.filter_by(category_id=category_id).all()
+    else:
+        products = Product.query.all()
 
+    # Get all categories for the navigation
+    categories = Category.query.all()
+
+    return render_template('products.html',
+                           products=products,
+                           categories=categories,
+                           selected_category=selected_category)
+
+# Update the product_detail route to include category information
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
@@ -310,20 +375,84 @@ def product_detail(product_id):
         'product_detail.html',
         product=product,
         existing_order_item=existing_order_item,
-        images=serialized_images  # Pass serialized images
+        images=serialized_images
     )
 
 
+
+# Add these new routes for category management
+@app.route('/admin/categories')
+@admin_required
+def manage_categories():
+    categories = Category.query.all()
+    return render_template('manage_categories.html', categories=categories)
+
+
+@app.route('/admin/add_category', methods=['GET', 'POST'])
+@admin_required
+def add_category():
+    form = CategoryForm()
+    if form.validate_on_submit():
+        category = Category(
+            name=form.name.data,
+            description=form.description.data
+        )
+        try:
+            db.session.add(category)
+            db.session.commit()
+            flash('Category added successfully!', 'success')
+            return redirect(url_for('manage_categories'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('Category name already exists.', 'danger')
+    return render_template('add_category.html', form=form)
+
+
+@app.route('/admin/edit_category/<int:category_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_category(category_id):
+    category = Category.query.get_or_404(category_id)
+    form = CategoryForm(obj=category)
+    if form.validate_on_submit():
+        category.name = form.name.data
+        category.description = form.description.data
+        try:
+            db.session.commit()
+            flash('Category updated successfully!', 'success')
+            return redirect(url_for('manage_categories'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('Category name already exists.', 'danger')
+    return render_template('edit_category.html', form=form, category=category)
+
+
+@app.route('/admin/delete_category/<int:category_id>', methods=['POST'])
+@admin_required
+def delete_category(category_id):
+    category = Category.query.get_or_404(category_id)
+    if category.products:
+        flash('Cannot delete category with associated products.', 'danger')
+    else:
+        db.session.delete(category)
+        db.session.commit()
+        flash('Category deleted successfully!', 'success')
+    return redirect(url_for('manage_categories'))
+
+
+# Update the add_product and edit_product routes
 @app.route('/admin/add_product', methods=['GET', 'POST'])
 @admin_required
 def add_product():
     form = ProductForm()
+    form.category.choices = [(c.id, c.name) for c in Category.query.all()]
+
     if form.validate_on_submit():
         product = Product(
             name=form.name.data,
             description=form.description.data,
             price=float(form.price.data),
-            stock_quantity=int(form.stock_quantity.data)
+            stock_quantity=int(form.stock_quantity.data),
+            category_id=form.category.data
         )
         db.session.add(product)
         db.session.commit()
@@ -337,10 +466,9 @@ def add_product():
 
                 product_image = ProductImage(
                     product_id=product.id,
-                    image_url=filename  # Store just the filename
+                    image_url=filename
                 )
                 db.session.add(product_image)
-
             db.session.commit()
 
         flash('Product added successfully!', 'success')
@@ -348,17 +476,21 @@ def add_product():
 
     return render_template('add_product.html', form=form)
 
+
 @app.route('/product/<int:product_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     form = ProductForm(obj=product)
+    form.category.choices = [(c.id, c.name) for c in Category.query.all()]
+    form.category.data = product.category_id
 
     if form.validate_on_submit():
         product.name = form.name.data
         product.description = form.description.data
         product.price = float(form.price.data)
         product.stock_quantity = int(form.stock_quantity.data)
+        product.category_id = form.category.data
 
         if 'delete_images' in request.form:
             for image_id in request.form.getlist('delete_images'):
@@ -382,7 +514,7 @@ def edit_product(product_id):
 
                     product_image = ProductImage(
                         product_id=product.id,
-                        image_url=filename  # Store just the filename
+                        image_url=filename
                     )
                     db.session.add(product_image)
 
@@ -396,7 +528,6 @@ def edit_product(product_id):
             print(f"Database error: {e}")
 
     return render_template('edit_product.html', form=form, product=product)
-
 
 
 @app.route('/admin/delete_product/<int:product_id>', methods=['POST'])
@@ -1037,4 +1168,4 @@ if __name__ == '__main__':
             db.session.add(Role(name='customer'))
         db.session.commit()
 
-    app.run(debug=False)  # Set debug to False for production
+    app.run(debug=True)  # Set debug to False for production
