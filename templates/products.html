@@ -41,67 +41,64 @@
 
     <div class="products-grid">
         {% for product in products %}
-        <div class="product-card">
-            <div class="product-image">
-                <div class="image-badges">
-                    {% if product.is_new %}
-                        <span class="badge new">New</span>
-                    {% endif %}
-                    {% if product.discount %}
-                        <span class="badge sale">Sale</span>
-                    {% endif %}
-                    <span class="badge category">{{ product.category.name }}</span>
-                </div>
-                {% if product.images %}
-                    <img src="{{ url_for('static', filename='uploads/' + product.images[0].image_url) }}"
-                         alt="Image of {{ product.name }}">
-                {% else %}
-                    <div class="no-image">
-                        <i class="bi bi-image"></i>
-                        <p>No image available</p>
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="product-content">
-                <h2 class="product-title">
-                    <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a>
-                </h2>
-
-                <div class="price-section">
-                    {% if product.original_price and product.original_price > product.price %}
-                        <span class="original-price">KES {{ product.original_price }}</span>
-                    {% endif %}
-                    <span class="current-price">KES {{ product.price }}</span>
-                </div>
-
-                <p class="product-description">{{ product.description|truncate(100) }}</p>
-
-                <div class="stock-status {% if product.stock_quantity > 0 %}in-stock{% else %}out-of-stock{% endif %}">
-                    <div class="stock-indicator">
-                        <div class="indicator-dot"></div>
-                        {% if product.stock_quantity > 0 %}
-                            <span>In Stock</span>
-                        {% else %}
-                            <span>Out of Stock</span>
+        <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product-card-link">
+            <div class="product-card">
+                <div class="product-image">
+                    <div class="image-badges">
+                        {% if product.is_new %}
+                            <span class="badge new">New</span>
                         {% endif %}
+                        {% if product.discount %}
+                            <span class="badge sale">Sale</span>
+                        {% endif %}
+                        <span class="badge category">{{ product.category.name }}</span>
                     </div>
+                    {% if product.images %}
+                        <img src="{{ url_for('static', filename='uploads/' + product.images[0].image_url) }}"
+                             alt="Image of {{ product.name }}">
+                    {% else %}
+                        <div class="no-image">
+                            <i class="bi bi-image"></i>
+                            <p>No image available</p>
+                        </div>
+                    {% endif %}
                 </div>
 
-                <div class="product-actions">
-                    <a href="{{ url_for('product_detail', product_id=product.id) }}" class="view-details">
-                        View Details
-                        <i class="bi bi-arrow-right"></i>
-                    </a>
+                <div class="product-content">
+                    <h2 class="product-title">{{ product.name }}</h2>
+
+                    <div class="price-section">
+                        {% if product.original_price and product.original_price > product.price %}
+                            <span class="original-price">KES {{ product.original_price }}</span>
+                        {% endif %}
+                        <span class="current-price">KES {{ product.price }}</span>
+                    </div>
+
+                    <p class="product-description">{{ product.description|truncate(100) }}</p>
+
+                    <div class="stock-status {% if product.stock_quantity > 0 %}in-stock{% else %}out-of-stock{% endif %}">
+                        <div class="stock-indicator">
+                            <div class="indicator-dot"></div>
+                            {% if product.stock_quantity > 0 %}
+                                <span>In Stock</span>
+                            {% else %}
+                                <span>Out of Stock</span>
+                            {% endif %}
+                        </div>
+
+
+                    </div>
+
                 </div>
             </div>
-        </div>
+        </a>
         {% else %}
         <div class="no-products">
             <p>No products found in this category.</p>
         </div>
         {% endfor %}
     </div>
+
 </div>
 
 <style>
@@ -171,26 +168,42 @@
     }
 }
 
+.product-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-card-link:hover {
+    transform: translateY(-4px);
+    text-decoration: none;
+}
+
 .product-card {
     background: white;
     border-radius: 1rem;
     overflow: hidden;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
                 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transition: transform 0.2s, box-shadow 0.2s;
 }
 
+.product-card-link:hover .product-card {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Remove previous hover styles from product-card */
+.product-card:hover {
+    transform: none;
+    box-shadow: none;
+}
 @media (min-width: 640px) {
     .product-card {
         border-radius: 1.5rem;
     }
 }
 
-.product-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
 
 .product-image {
     position: relative;

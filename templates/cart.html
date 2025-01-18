@@ -336,11 +336,11 @@
 
 <script>
     function formatPrice(value) {
-        return `KES KES {value.toFixed(2)}`;
+        return `KES ${value.toFixed(2)}`;
     }
 
     function updateQuantity(itemId, action, value) {
-        let input = document.querySelector(`input[data-item-id="KES {itemId}"]`);
+        let input = document.querySelector(`input[data-item-id="${itemId}"]`);
         let currentValue = parseInt(input.value);
         let newValue;
 
@@ -358,7 +358,7 @@
         const itemContainer = input.closest('.cart-item');
         itemContainer.style.opacity = '0.7';
 
-        fetch(`/update_quantity/KES {itemId}`, {
+        fetch(`/update_quantity/${itemId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
