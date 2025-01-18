@@ -1211,6 +1211,105 @@ def update_quantity(order_item_id):
         return jsonify({'error': str(e)}), 500
 
 
+# Add these new routes to your Flask application
+
+@app.route('/buy_now/<int:product_id>', methods=['POST'])
+def buy_now(product_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Please login to proceed'}), 401
+
+    try:
+        quantity = int(request.form.get('quantity', 1))
+        product = Product.query.get_or_404(product_id)
+
+        # Check stock availability
+        if quantity > product.stock_quantity:
+            return jsonify({
+                'error': 'Not enough stock available',
+                'available_stock': product.stock_quantity
+            }), 400
+
+        # Create a new order specifically for buy now
+        buy_now_order = Order(
+            user_id=session['user_id'],
+            total_price=product.price * quantity,
+            status="BuyNow"  # Special status to distinguish from cart orders
+        )
+        db.session.add(buy_now_order)
+        db.session.flush()  # Get the order ID without committing
+
+        # Create order item
+        order_item = OrderItem(
+            order_id=buy_now_order.id,
+            product_id=product_id,
+            quantity=quantity,
+            price_at_time=product.price
+        )
+        db.session.add(order_item)
+
+        # Temporarily reduce stock
+        product.stock_quantity -= quantity
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'redirect_url': url_for('buy_now_checkout', order_id=buy_now_order.id)
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/buy_now_checkout/<int:order_id>')
+def buy_now_checkout(order_id):
+    if 'user_id' not in session:
+        flash('Please login to checkout.', 'warning')
+        return redirect(url_for('login'))
+
+    order = Order.query.filter_by(
+        id=order_id,
+        user_id=session['user_id'],
+        status="BuyNow"
+    ).first_or_404()
+
+    # Get user's phone number for pre-filling
+    user = User.query.get(session['user_id'])
+
+    return render_template(
+        'buy_now_checkout.html',
+        order=order,
+        user_phone=user.phone_number
+    )
+
+
+@app.route('/cancel_buy_now/<int:order_id>', methods=['POST'])
+def cancel_buy_now(order_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    order = Order.query.filter_by(
+        id=order_id,
+        user_id=session['user_id'],
+        status="BuyNow"
+    ).first_or_404()
+
+    try:
+        # Restore product stock
+        for item in order.order_items:
+            product = Product.query.get(item.product_id)
+            product.stock_quantity += item.quantity
+
+        # Delete the order
+        db.session.delete(order)
+        db.session.commit()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     with app.app_context():

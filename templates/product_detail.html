@@ -156,10 +156,10 @@
                             <i class="bi bi-cart-plus"></i>
                             <span>{% if existing_order_item %}Update Cart{% else %}Add to Cart / Buy Now{% endif %}</span>
                         </button>
-<!--                        <button type="button" class="primary-btn buy-now">-->
-<!--                            <i class="bi bi-lightning"></i>-->
-<!--                            <span>Buy Now</span>-->
-<!--                        </button>-->
+                        <button type="button" class="primary-btn buy-now">
+                            <i class="bi bi-lightning"></i>
+                            <span>Buy Now</span>
+                        </button>
                     </div>
                 </form>
 
@@ -295,6 +295,33 @@ document.addEventListener('DOMContentLoaded', function() {
     window.updateLocation = function() {
         // Implement location selector modal
         alert('Location selector coming soon!');
+    }
+});
+
+// Add this script to your product_detail.html template
+document.querySelector('.buy-now').addEventListener('click', async function() {
+    const quantityInput = document.querySelector('#quantity');
+    const quantity = quantityInput.value;
+    const productId = '{{ product.id }}';
+
+    try {
+        const response = await fetch(`/buy_now/${productId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `quantity=${quantity}`
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            throw new Error(data.message || 'Failed to process buy now request');
+        }
+    } catch (error) {
+        alert(error.message);
     }
 });
 </script>
