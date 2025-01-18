@@ -185,14 +185,21 @@ class MpesaAccessToken:
             consumer_secret = MpesaC2bCredential.consumer_secret
             api_URL = MpesaC2bCredential.api_URL
 
+            print(f"Requesting M-Pesa access token from: {api_URL}")
+
             r = requests.get(api_URL, auth=HTTPBasicAuth(consumer_key, consumer_secret))
-            r.raise_for_status()  # Raise an exception for bad status codes
+            print(f"M-Pesa auth response status: {r.status_code}")
+            print(f"M-Pesa auth response: {r.text}")
+
+            r.raise_for_status()
             mpesa_access_token = json.loads(r.text)
             return mpesa_access_token['access_token']
-        except requests.exceptions.RequestException as e:
-            print(f"Error getting access token: {str(e)}")
-            raise Exception("Failed to get M-Pesa access token")
 
+        except requests.exceptions.RequestException as e:
+            print(f"M-Pesa authentication error: {str(e)}")
+            if hasattr(e.response, 'text'):
+                print(f"M-Pesa error response: {e.response.text}")
+            raise Exception(f"Failed to get M-Pesa access token: {str(e)}")
 
 class LipaNaMpesaOnline:
     def __init__(self):
@@ -1077,14 +1084,24 @@ def mpesa_callback():
 @app.route('/initiate_payment', methods=['POST'])
 def initiate_payment():
     try:
+        # Check user authentication
         if 'user_id' not in session:
-            return jsonify({'error': 'Please login to checkout'}), 401
+            return jsonify({
+                'success': False,
+                'message': 'Please login to checkout',
+                'error_type': 'auth_error'
+            }), 401
 
+        # Get pending order
         order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
         if not order:
-            return jsonify({'error': 'No pending order found'}), 404
+            return jsonify({
+                'success': False,
+                'message': 'No pending order found',
+                'error_type': 'order_error'
+            }), 404
 
-        # Check if payment already exists
+        # Check existing payment
         if order.payment:
             if order.payment.payment_status == "Pending":
                 return jsonify({
@@ -1092,12 +1109,18 @@ def initiate_payment():
                     'message': 'Payment already initiated. Please check your phone.',
                     'checkout_request_id': order.payment.checkout_request_id
                 })
+            # Delete existing payment if not pending
             db.session.delete(order.payment)
             db.session.commit()
 
+        # Validate phone number
         phone_number = request.form.get('phone_number', '').strip()
         if not phone_number:
-            return jsonify({'error': 'Phone number is required'}), 400
+            return jsonify({
+                'success': False,
+                'message': 'Phone number is required',
+                'error_type': 'validation_error'
+            }), 400
 
         # Format phone number
         if phone_number.startswith('+'):
@@ -1108,10 +1131,15 @@ def initiate_payment():
             phone_number = '254' + phone_number
 
         if not phone_number.isdigit() or len(phone_number) != 12:
-            return jsonify({'error': 'Invalid phone number format'}), 400
+            return jsonify({
+                'success': False,
+                'message': 'Invalid phone number format. Use format: 07XXXXXXXX',
+                'error_type': 'validation_error'
+            }), 400
 
         amount = int(order.total_price)
 
+        # Create payment record
         payment = Payment(
             order_id=order.id,
             payment_method="MPESA",
@@ -1123,36 +1151,70 @@ def initiate_payment():
 
         try:
             mpesa = LipaNaMpesaOnline()
-            # Use PythonAnywhere URL for callback
             callback_url = f"{SITE_URL}/mpesa_callback"
-            print(f"Initiating payment for order {order.id} with callback URL: {callback_url}")
 
+            # Log the request details
+            print(f"Initiating M-Pesa payment:")
+            print(f"- Order ID: {order.id}")
+            print(f"- Amount: {amount}")
+            print(f"- Phone: {phone_number}")
+            print(f"- Callback URL: {callback_url}")
+
+            # Make the M-Pesa API call
             response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
+
+            # Log the M-Pesa response
             print(f"M-Pesa API Response: {response}")
 
-            if 'CheckoutRequestID' in response:
-                payment.checkout_request_id = response['CheckoutRequestID']
+            if 'errorCode' in response:
+                # Handle M-Pesa API error
+                error_message = response.get('errorMessage', 'M-Pesa service error')
+                db.session.delete(payment)
                 db.session.commit()
                 return jsonify({
-                    'success': True,
-                    'message': 'Payment initiated. Please check your phone.',
-                    'checkout_request_id': response['CheckoutRequestID']
-                })
+                    'success': False,
+                    'message': f"M-Pesa error: {error_message}",
+                    'error_type': 'mpesa_error'
+                }), 400
 
-            raise Exception("No CheckoutRequestID in M-Pesa response")
+            if 'CheckoutRequestID' not in response:
+                db.session.delete(payment)
+                db.session.commit()
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid M-Pesa response',
+                    'error_type': 'mpesa_error'
+                }), 500
+
+            # Update payment record with checkout request ID
+            payment.checkout_request_id = response['CheckoutRequestID']
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Payment initiated. Please check your phone.',
+                'checkout_request_id': response['CheckoutRequestID']
+            })
 
         except Exception as e:
+            # Log the specific M-Pesa error
+            print(f"M-Pesa API Error: {str(e)}")
             db.session.delete(payment)
             db.session.commit()
-            raise
+            return jsonify({
+                'success': False,
+                'message': f'M-Pesa service error: {str(e)}',
+                'error_type': 'mpesa_error'
+            }), 500
 
     except Exception as e:
+        # Log any other unexpected errors
         print(f"Payment initiation error: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'Payment initiation failed: {str(e)}'
+            'message': f'Payment initiation failed: {str(e)}',
+            'error_type': 'system_error'
         }), 500
-
 
 
 # Add this new route to your Flask application

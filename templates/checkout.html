@@ -274,9 +274,14 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
 
     const payButton = document.getElementById('payButton');
     const statusDiv = document.getElementById('paymentStatus');
+    const messageDiv = statusDiv.querySelector('.alert');
 
     payButton.disabled = true;
     payButton.innerHTML = '<i class="bi bi-arrow-repeat"></i> Processing...';
+    statusDiv.style.display = 'block';
+
+    messageDiv.className = 'alert';
+    messageDiv.innerHTML = '<p>Initiating payment...</p>';
 
     fetch('/initiate_payment', {
         method: 'POST',
@@ -290,17 +295,36 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            statusDiv.style.display = 'block';
+            messageDiv.className = 'alert alert-info';
+            messageDiv.innerHTML = '<p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>' +
+                                 '<p>Waiting for payment confirmation...</p>';
             pollPaymentStatus(data.checkout_request_id);
         } else {
-            alert(data.message);
+            messageDiv.className = 'alert alert-danger';
+            let errorMessage = data.message;
+
+            // Customize message based on error type
+            switch(data.error_type) {
+                case 'auth_error':
+                    errorMessage = 'Please log in to continue with checkout.';
+                    break;
+                case 'validation_error':
+                    errorMessage = `Invalid input: ${data.message}`;
+                    break;
+                case 'mpesa_error':
+                    errorMessage = `M-Pesa service error: ${data.message}`;
+                    break;
+            }
+
+            messageDiv.innerHTML = `<p><strong>Error:</strong> ${errorMessage}</p>`;
             payButton.disabled = false;
             payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred. Please try again.');
+        messageDiv.className = 'alert alert-danger';
+        messageDiv.innerHTML = '<p><strong>System Error:</strong> Unable to process payment. Please try again.</p>';
         payButton.disabled = false;
         payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
     });
