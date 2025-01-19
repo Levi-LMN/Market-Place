@@ -226,24 +226,30 @@ class LipaNaMpesaOnline:
                 "Password": self.encode_password(),
                 "Timestamp": self.timestamp,
                 "TransactionType": "CustomerPayBillOnline",
-                "Amount": int(amount),  # Ensure amount is an integer
-                "PartyA": int(phone_number),  # Convert phone number to integer
+                "Amount": int(amount),
+                "PartyA": int(phone_number),
                 "PartyB": self.business_shortcode,
-                "PhoneNumber": int(phone_number),  # Convert phone number to integer
+                "PhoneNumber": int(phone_number),
                 "CallBackURL": callback_url,
                 "AccountReference": "LevisStore",
                 "TransactionDesc": "Payment for order"
             }
 
+            print(f"STK Push Request Payload: {json.dumps(payload, indent=2)}")
+            print(f"STK Push Headers: {headers}")
+
             response = requests.post(api_url, json=payload, headers=headers)
-            response.raise_for_status()  # Raise an exception for bad status codes
+            print(f"STK Push Response Status Code: {response.status_code}")
+            print(f"STK Push Response Body: {response.text}")
+
+            response.raise_for_status()
             return response.json()
 
         except requests.exceptions.RequestException as e:
-            print(f"Error in STK push: {str(e)}")
+            print(f"STK Push Error: {str(e)}")
             if hasattr(e.response, 'text'):
-                print(f"M-Pesa API response: {e.response.text}")
-            raise Exception("Failed to initiate M-Pesa payment")
+                print(f"STK Push Error Response: {e.response.text}")
+            raise Exception(f"Failed to initiate M-Pesa payment: {str(e)}")
 
 
 
