@@ -4,7 +4,6 @@
 
 {% block content %}
 <div class="checkout-container">
-    <!-- Breadcrumb -->
     <nav class="breadcrumb">
         <a href="{{ url_for('home') }}">Home</a>
         <span>/</span>
@@ -44,27 +43,31 @@
         <div class="payment-section">
             <div class="card">
                 <div class="card-header">
-                    <h2>M-Pesa Payment</h2>
+                    <h2>Payment Instructions</h2>
                 </div>
                 <div class="card-body">
-                    <form id="paymentForm">
-                        <div class="form-group">
-                            <label for="phone_number">Phone Number</label>
-                            <input type="text" id="phone_number" name="phone_number"
-                                   placeholder="e.g., 0712345678" required>
-                            <small>Enter the M-Pesa number to receive payment prompt</small>
-                        </div>
-                        <button type="submit" class="pay-button" id="payButton">
-                            <i class="bi bi-credit-card"></i>
-                            Pay with M-Pesa
-                        </button>
-                    </form>
-                    <div id="paymentStatus" class="payment-status" style="display: none;">
-                        <div class="alert">
-                            <p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>
-                            <p>Once you complete the payment, you will be redirected automatically.</p>
+                    <div class="payment-instructions">
+                        <p>Please follow these steps to complete your order:</p>
+                        <ol class="instructions-list">
+                            <li>Review your order details above</li>
+                            <li>Note down your order reference number that will be provided after placing the order</li>
+                            <li>Make your payment using one of these methods:
+                                <ul>
+                                    <li>M-Pesa Pay Bill: <strong>123456</strong></li>
+                                    <li>Bank Transfer: <strong>ACC-12345678</strong></li>
+                                </ul>
+                            </li>
+                            <li>Use your order reference as the payment reference</li>
+                        </ol>
+                        <div class="alert alert-info">
+                            <p>Your order will be processed once payment is confirmed.</p>
                         </div>
                     </div>
+                    <form action="{{ url_for('checkout') }}" method="POST" class="mt-4">
+                        <button type="submit" class="place-order-button">
+                            Place Order
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -166,44 +169,38 @@
     color: #111827;
 }
 
-.form-group {
-    margin-bottom: 1.5rem;
+.instructions-list {
+    padding-left: 1.5rem;
+    margin: 1.5rem 0;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #374151;
+.instructions-list li {
+    margin-bottom: 1rem;
 }
 
-.form-group input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    font-size: 1rem;
-    transition: border-color 0.2s;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-group small {
-    display: block;
+.instructions-list ul {
     margin-top: 0.5rem;
-    color: #6b7280;
-    font-size: 0.875rem;
+    padding-left: 1.5rem;
 }
 
-.pay-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
+.instructions-list ul li {
+    margin-bottom: 0.5rem;
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin: 1.5rem 0;
+}
+
+.alert-info {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+}
+
+.place-order-button {
+    display: block;
     width: 100%;
     padding: 1rem;
     background: #2563eb;
@@ -216,45 +213,9 @@
     transition: all 0.2s;
 }
 
-.pay-button:hover {
+.place-order-button:hover {
     background: #1d4ed8;
     transform: translateY(-2px);
-}
-
-.pay-button:disabled {
-    background: #9ca3af;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.payment-status {
-    margin-top: 1.5rem;
-}
-
-.alert {
-    padding: 1rem;
-    border-radius: 0.75rem;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    color: #1e40af;
-}
-
-.alert.alert-success {
-    background: #f0fdf4;
-    border-color: #86efac;
-    color: #166534;
-}
-
-.alert.alert-danger {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #991b1b;
-}
-
-.alert.alert-warning {
-    background: #fff7ed;
-    border-color: #fed7aa;
-    color: #9a3412;
 }
 
 @media (max-width: 768px) {
@@ -267,202 +228,4 @@
     }
 }
 </style>
-
-<script>
-
-    document.getElementById('paymentForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    const payButton = document.getElementById('payButton');
-    const statusDiv = document.getElementById('paymentStatus');
-    const messageDiv = statusDiv.querySelector('.alert');
-    const phoneNumber = document.getElementById('phone_number').value;
-
-    // Disable form and show initial status
-    payButton.disabled = true;
-    payButton.innerHTML = '<i class="bi bi-arrow-repeat"></i> Processing...';
-    statusDiv.style.display = 'block';
-    messageDiv.className = 'alert';
-    messageDiv.innerHTML = '<p>Initiating payment...</p>';
-
-    // Initialize payment
-    fetch('/initiate_payment', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            'phone_number': phoneNumber
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            messageDiv.className = 'alert alert-info';
-            messageDiv.innerHTML = `
-                <p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>
-                <p>Waiting for payment confirmation...</p>
-                <p><small>Phone number: ${phoneNumber}</small></p>
-            `;
-            startPaymentStatusPolling(data.checkout_request_id);
-        } else {
-            handlePaymentError(data, payButton, messageDiv);
-        }
-    })
-    .catch(error => handleSystemError(error, payButton, messageDiv));
-});
-
-function startPaymentStatusPolling(checkoutRequestId) {
-    const statusDiv = document.getElementById('paymentStatus');
-    const messageDiv = statusDiv.querySelector('.alert');
-    const payButton = document.getElementById('payButton');
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes maximum
-    const pollInterval = 3000; // Poll every 3 seconds instead of 5
-
-    const pollTimer = setInterval(() => {
-        attempts++;
-
-        fetch(`/check_payment_status/${checkoutRequestId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                updatePaymentStatus(data, {
-                    messageDiv,
-                    payButton,
-                    pollTimer,
-                    attempts,
-                    maxAttempts,
-                    checkoutRequestId
-                });
-            })
-            .catch(error => {
-                console.error('Polling error:', error);
-                // Don't stop polling on network errors unless max attempts reached
-                if (attempts >= maxAttempts) {
-                    clearInterval(pollTimer);
-                    handlePollingError(messageDiv, payButton);
-                }
-            });
-    }, pollInterval);
-
-    // Store the timer ID to clear it if needed
-    window.currentPollTimer = pollTimer;
-}
-
-function updatePaymentStatus(data, options) {
-    const { messageDiv, payButton, pollTimer, attempts, maxAttempts } = options;
-
-    switch(data.status) {
-        case 'Completed':
-            clearInterval(pollTimer);
-            messageDiv.className = 'alert alert-success';
-            messageDiv.innerHTML = `
-                <p><strong>Payment Successful!</strong></p>
-                <p>Transaction ID: ${data.transaction_id || 'Processing'}</p>
-                <p>Redirecting to order confirmation...</p>
-            `;
-            setTimeout(() => {
-                window.location.href = `/order_confirmation/${data.order_id}`;
-            }, 2000);
-            break;
-
-        case 'Failed':
-            clearInterval(pollTimer);
-            messageDiv.className = 'alert alert-danger';
-            messageDiv.innerHTML = `
-                <p><strong>Payment Failed</strong></p>
-                <p>${data.message || 'Please try again or use a different phone number.'}</p>
-            `;
-            resetPayButton(payButton);
-            break;
-
-        case 'Pending':
-            if (attempts >= maxAttempts) {
-                clearInterval(pollTimer);
-                handleTimeout(messageDiv, payButton);
-            } else {
-                updatePendingStatus(messageDiv, attempts);
-            }
-            break;
-
-        default:
-            // Keep polling but update the message
-            messageDiv.className = 'alert alert-warning';
-            messageDiv.innerHTML = `
-                <p>Checking payment status...</p>
-                <p>Please complete the payment on your phone if you haven't already.</p>
-            `;
-    }
-}
-
-function updatePendingStatus(messageDiv, attempts) {
-    const dots = '.'.repeat((attempts % 3) + 1);
-    messageDiv.innerHTML = `
-        <p>Waiting for payment confirmation${dots}</p>
-        <p>Please complete the payment on your phone if you haven't already.</p>
-        <p><small>You can safely close this window after payment. We'll email you the confirmation.</small></p>
-    `;
-}
-
-function handleTimeout(messageDiv, payButton) {
-    messageDiv.className = 'alert alert-warning';
-    messageDiv.innerHTML = `
-        <p><strong>Status Check Timeout</strong></p>
-        <p>If you completed the payment, please check your email for confirmation.</p>
-        <p>If you haven't paid yet, you can try again or contact support.</p>
-    `;
-    resetPayButton(payButton);
-}
-
-function handlePaymentError(data, payButton, messageDiv) {
-    messageDiv.className = 'alert alert-danger';
-    const errorMessage = getErrorMessage(data);
-    messageDiv.innerHTML = `<p><strong>Error:</strong> ${errorMessage}</p>`;
-    resetPayButton(payButton);
-}
-
-function handleSystemError(error, payButton, messageDiv) {
-    console.error('System Error:', error);
-    messageDiv.className = 'alert alert-danger';
-    messageDiv.innerHTML = `
-        <p><strong>System Error:</strong> Unable to process payment.</p>
-        <p>Please try again or contact support if the problem persists.</p>
-    `;
-    resetPayButton(payButton);
-}
-
-function handlePollingError(messageDiv, payButton) {
-    messageDiv.className = 'alert alert-warning';
-    messageDiv.innerHTML = `
-        <p><strong>Connection Error</strong></p>
-        <p>Unable to check payment status. If you completed the payment, please check your email for confirmation.</p>
-        <p>You can try again or contact support if needed.</p>
-    `;
-    resetPayButton(payButton);
-}
-
-function resetPayButton(payButton) {
-    payButton.disabled = false;
-    payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
-}
-
-function getErrorMessage(data) {
-    switch(data.error_type) {
-        case 'auth_error':
-            return 'Please log in to continue with checkout.';
-        case 'validation_error':
-            return `Invalid input: ${data.message}`;
-        case 'mpesa_error':
-            return `M-Pesa service error: ${data.message}`;
-        default:
-            return data.message || 'An unexpected error occurred.';
-    }
-}
-
-</script>
 {% endblock %}

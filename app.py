@@ -26,6 +26,8 @@ from requests.auth import HTTPBasicAuth
 import base64
 from datetime import datetime
 import json
+import random
+from enum import Enum
 
 # Add these imports if not already present
 from datetime import datetime, timedelta
@@ -70,18 +72,39 @@ class ProductImage(db.Model):
 
 
 
-# Update the Order model relationship with Payment
+
+
+class OrderStatus(Enum):
+    AWAITING_PAYMENT = "Awaiting Payment"
+    PROCESSING = "Processing"
+    SHIPPED = "Shipped"
+    DELIVERED = "Delivered"
+    CANCELLED = "Cancelled"
+    PENDING = "Pending"
+
 class Order(db.Model):
     __tablename__ = 'orders'
     id = db.Column(db.Integer, primary_key=True)
+    reference_number = db.Column(db.String(50), unique=True, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     total_price = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(50), nullable=False, default='Pending')
+    status = db.Column(db.String(50), nullable=False, default=OrderStatus.PENDING.value)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
     order_items = db.relationship('OrderItem', backref='order', lazy=True)
-    # Modified relationship to ensure one-to-one
     payment = db.relationship('Payment', backref='order', uselist=False, cascade="all, delete-orphan")
 
+    @property
+    def status_color(self):
+        """Return the appropriate color class for the status badge."""
+        status_colors = {
+            OrderStatus.AWAITING_PAYMENT.value: "bg-yellow-500",
+            OrderStatus.PROCESSING.value: "bg-orange-500",
+            OrderStatus.SHIPPED.value: "bg-blue-500",
+            OrderStatus.DELIVERED.value: "bg-green-500",
+            OrderStatus.CANCELLED.value: "bg-red-500",
+            OrderStatus.PENDING.value: "bg-gray-500"
+        }
+        return status_colors.get(self.status, "bg-gray-500")
 
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
@@ -700,13 +723,6 @@ def remove_from_cart(order_item_id):
 
 
 
-@app.route('/order_confirmation/<int:order_id>')
-def order_confirmation(order_id):
-    order = Order.query.get_or_404(order_id)
-    if order.user_id != session.get('user_id'):
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('home'))
-    return render_template('order_confirmation.html', order=order)
 
 
 @app.route('/admin/manage_products')
@@ -810,10 +826,15 @@ def manage_orders():
 def update_order_status(order_id):
     order = Order.query.get_or_404(order_id)
     new_status = request.form.get('status')
-    if new_status in ['Processing', 'Shipped', 'Delivered', 'Cancelled']:
+
+    # Include "Awaiting Payment" in the list of valid statuses
+    if new_status in ['Awaiting Payment', 'Processing', 'Shipped', 'Delivered', 'Cancelled']:
         order.status = new_status
         db.session.commit()
         flash('Order status updated successfully!', 'success')
+    else:
+        flash('Invalid status update!', 'danger')
+
     return redirect(url_for('manage_orders'))
 
 def get_cart_unique_items():
@@ -833,7 +854,6 @@ def inject_cart_count():
 from datetime import datetime
 
 
-# Add new route before the checkout route
 @app.route('/checkout_page')
 def checkout_page():
     if 'user_id' not in session:
@@ -848,7 +868,22 @@ def checkout_page():
     return render_template('checkout.html', order=order)
 
 
-# Modify existing checkout route
+def generate_unique_reference():
+    """Generate a unique order reference number."""
+    while True:
+        # Generate a reference number with format: ORD-YYYYMMDD-XXXXX
+        # Where XXXXX is a random 5-digit number
+        timestamp = datetime.now().strftime('%Y%m%d')
+        random_num = ''.join([str(random.randint(0, 9)) for _ in range(5)])
+        reference = f"ORD-{timestamp}-{random_num}"
+
+        # Check if this reference already exists
+        existing_order = Order.query.filter_by(reference_number=reference).first()
+        if not existing_order:
+            return reference
+
+
+# Update the checkout route
 @app.route('/checkout', methods=['POST'])
 def checkout():
     if 'user_id' not in session:
@@ -860,370 +895,51 @@ def checkout():
         flash('Your cart is empty.', 'info')
         return redirect(url_for('view_cart'))
 
-    mpesa_transaction_id = request.form.get('mpesa_transaction_id')
+    # Generate and set unique reference number
+    order.reference_number = generate_unique_reference()
+    order.status = "Awaiting Payment"
 
-    if not mpesa_transaction_id:
-        flash('Please provide MPESA transaction ID.', 'danger')
-        return redirect(url_for('checkout_page'))
-
-    payment = Payment(
-        order_id=order.id,
-        payment_method="MPESA",
-        payment_status="Completed",
-        mpesa_transaction_id=mpesa_transaction_id
+    # Create a new empty cart order for the user
+    new_cart = Order(
+        user_id=order.user_id,
+        total_price=0,
+        status="Pending"
     )
-    db.session.add(payment)
-    order.status = "Processing"
+    db.session.add(new_cart)
 
     try:
         db.session.commit()
-        flash('Order placed successfully!', 'success')
+        flash(
+            f'Order placed successfully! Your order reference is {order.reference_number}. Please make your payment using this reference number.',
+            'success')
+        return redirect(url_for('order_confirmation', order_id=order.id))
+    except IntegrityError:
+        db.session.rollback()
+        # In case of a collision (very unlikely), try again with a new reference
+        order.reference_number = generate_unique_reference()
+        db.session.commit()
+        flash(
+            f'Order placed successfully! Your order reference is {order.reference_number}. Please make your payment using this reference number.',
+            'success')
         return redirect(url_for('order_confirmation', order_id=order.id))
     except Exception as e:
         db.session.rollback()
         flash('Error processing order.', 'danger')
         return redirect(url_for('checkout_page'))
 
+@app.route('/order_confirmation/<int:order_id>')
+def order_confirmation(order_id):
+    if 'user_id' not in session:
+        flash('Please login to view order confirmation.', 'warning')
+        return redirect(url_for('login'))
 
+    order = Order.query.filter_by(id=order_id, user_id=session['user_id']).first()
+    if not order:
+        flash('Order not found.', 'error')
+        return redirect(url_for('home'))
 
-def check_mpesa_status(checkout_request_id):
-    """Check the status of an M-Pesa transaction"""
-    try:
-        access_token = MpesaAccessToken.validated_mpesa_access_token()
-        api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query"
+    return render_template('order_confirmation.html', order=order)
 
-        mpesa = LipaNaMpesaOnline()
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "BusinessShortCode": mpesa.business_shortcode,
-            "Password": mpesa.encode_password(),
-            "Timestamp": mpesa.timestamp,
-            "CheckoutRequestID": checkout_request_id
-        }
-
-        response = requests.post(api_url, json=payload, headers=headers)
-        return response.json()
-
-    except Exception as e:
-        print(f"Error querying M-Pesa status: {str(e)}")
-        return {"ResultCode": -1, "ResultDesc": "Error querying status"}
-
-
-# Add a new function to continuously check pending payments
-def check_pending_payments():
-    while True:
-        with app.app_context():
-            try:
-                # Get all pending payments from last 24 hours
-                cutoff_time = datetime.now() - timedelta(hours=24)
-                pending_payments = Payment.query.filter(
-                    Payment.payment_status == "Pending",
-                    Payment.created_at >= cutoff_time
-                ).all()
-
-                for payment in pending_payments:
-                    if payment.checkout_request_id:
-                        mpesa_status = check_mpesa_status(payment.checkout_request_id)
-
-                        if mpesa_status.get('ResultCode') == 0:
-                            # Payment successful
-                            payment.payment_status = "Completed"
-                            payment.mpesa_transaction_id = mpesa_status.get('MpesaReceiptNumber')
-
-                            # Update order status
-                            order = Order.query.get(payment.order_id)
-                            if order:
-                                order.status = "Processing"
-
-                            db.session.commit()
-                            print(f"Payment {payment.id} completed successfully")
-
-                        elif mpesa_status.get('ResultCode') is not None:
-                            # Payment failed
-                            payment.payment_status = "Failed"
-                            db.session.commit()
-                            print(f"Payment {payment.id} failed")
-
-            except Exception as e:
-                print(f"Error checking pending payments: {str(e)}")
-
-            # Wait for 30 seconds before next check
-            time.sleep(30)
-
-
-@app.route('/check_payment_status/<checkout_request_id>')
-def check_payment_status(checkout_request_id):
-    try:
-        payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
-        if not payment:
-            return jsonify({
-                'status': 'Failed',
-                'message': 'Payment not found'
-            }), 404
-
-        if payment.payment_status == "Completed" and payment.mpesa_transaction_id:
-            # Clear cart if payment is completed
-            order = Order.query.get(payment.order_id)
-            if order and order.status == "Pending":
-                order.status = "Processing"
-
-                # Create a new empty cart order for the user
-                new_cart = Order(
-                    user_id=order.user_id,
-                    total_price=0,
-                    status="Pending"
-                )
-                db.session.add(new_cart)
-                db.session.commit()
-
-            return jsonify({
-                'status': 'Completed',
-                'order_id': payment.order_id,
-                'transaction_id': payment.mpesa_transaction_id
-            })
-
-        if payment.payment_status == "Failed":
-            return jsonify({
-                'status': 'Failed',
-                'message': 'Payment failed. Please try again.'
-            })
-
-        # For pending payments, check M-Pesa status
-        mpesa_status = check_mpesa_status(payment.checkout_request_id)
-
-        if mpesa_status.get('ResultCode') == 0:
-            payment.payment_status = "Completed"
-            payment.mpesa_transaction_id = mpesa_status.get('MpesaReceiptNumber')
-
-            # Update order status and clear cart
-            order = Order.query.get(payment.order_id)
-            if order:
-                order.status = "Processing"
-
-                # Create a new empty cart order for the user
-                new_cart = Order(
-                    user_id=order.user_id,
-                    total_price=0,
-                    status="Pending"
-                )
-                db.session.add(new_cart)
-
-            db.session.commit()
-
-            return jsonify({
-                'status': 'Completed',
-                'order_id': payment.order_id,
-                'transaction_id': payment.mpesa_transaction_id
-            })
-
-        return jsonify({
-            'status': 'Pending',
-            'message': 'Payment is being processed'
-        })
-
-    except Exception as e:
-        print(f"Error checking payment status: {str(e)}")
-        return jsonify({
-            'status': 'Error',
-            'message': str(e)
-        }), 500
-
-
-@app.route('/mpesa_callback', methods=['POST'])
-def mpesa_callback():
-    try:
-        callback_data = request.get_json()
-        body = callback_data.get('Body', {})
-        stk_callback = body.get('stkCallback', {})
-
-        checkout_request_id = stk_callback.get('CheckoutRequestID')
-        result_code = stk_callback.get('ResultCode')
-
-        payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
-        if not payment:
-            print(f"No payment found for checkout_request_id: {checkout_request_id}")
-            return jsonify({'error': 'Payment not found'}), 404
-
-        if result_code == 0:
-            callback_metadata = stk_callback.get('CallbackMetadata', {})
-            items = callback_metadata.get('Item', [])
-
-            mpesa_receipt_number = None
-            for item in items:
-                if item.get('Name') == 'MpesaReceiptNumber':
-                    mpesa_receipt_number = str(item.get('Value'))
-                    break
-
-            if mpesa_receipt_number:
-                payment.payment_status = "Completed"
-                payment.mpesa_transaction_id = mpesa_receipt_number
-
-                # Update order status and clear cart
-                order = Order.query.get(payment.order_id)
-                if order and order.status == "Pending":
-                    order.status = "Processing"
-
-                    # Create a new empty cart order for the user
-                    new_cart = Order(
-                        user_id=order.user_id,
-                        total_price=0,
-                        status="Pending"
-                    )
-                    db.session.add(new_cart)
-
-                db.session.commit()
-                print(f"Payment updated with transaction ID: {mpesa_receipt_number}")
-
-        else:
-            payment.payment_status = "Failed"
-            db.session.commit()
-
-        return jsonify({'success': True})
-
-    except Exception as e:
-        print(f"Error in callback: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/initiate_payment', methods=['POST'])
-def initiate_payment():
-    try:
-        # Check user authentication
-        if 'user_id' not in session:
-            return jsonify({
-                'success': False,
-                'message': 'Please login to checkout',
-                'error_type': 'auth_error'
-            }), 401
-
-        # Get pending order
-        order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
-        if not order:
-            return jsonify({
-                'success': False,
-                'message': 'No pending order found',
-                'error_type': 'order_error'
-            }), 404
-
-        # Check existing payment
-        if order.payment:
-            if order.payment.payment_status == "Pending":
-                return jsonify({
-                    'success': True,
-                    'message': 'Payment already initiated. Please check your phone.',
-                    'checkout_request_id': order.payment.checkout_request_id
-                })
-            # Delete existing payment if not pending
-            db.session.delete(order.payment)
-            db.session.commit()
-
-        # Validate phone number
-        phone_number = request.form.get('phone_number', '').strip()
-        if not phone_number:
-            return jsonify({
-                'success': False,
-                'message': 'Phone number is required',
-                'error_type': 'validation_error'
-            }), 400
-
-        # Format phone number
-        if phone_number.startswith('+'):
-            phone_number = phone_number[1:]
-        elif phone_number.startswith('0'):
-            phone_number = '254' + phone_number[1:]
-        elif not phone_number.startswith('254'):
-            phone_number = '254' + phone_number
-
-        if not phone_number.isdigit() or len(phone_number) != 12:
-            return jsonify({
-                'success': False,
-                'message': 'Invalid phone number format. Use format: 07XXXXXXXX',
-                'error_type': 'validation_error'
-            }), 400
-
-        amount = int(order.total_price)
-
-        # Create payment record
-        payment = Payment(
-            order_id=order.id,
-            payment_method="MPESA",
-            payment_status="Pending",
-            phone_number=phone_number
-        )
-        db.session.add(payment)
-        db.session.commit()
-
-        try:
-            mpesa = LipaNaMpesaOnline()
-            callback_url = f"{SITE_URL}/mpesa_callback"
-
-            # Log the request details
-            print(f"Initiating M-Pesa payment:")
-            print(f"- Order ID: {order.id}")
-            print(f"- Amount: {amount}")
-            print(f"- Phone: {phone_number}")
-            print(f"- Callback URL: {callback_url}")
-
-            # Make the M-Pesa API call
-            response = mpesa.initiate_stk_push(phone_number, amount, callback_url)
-
-            # Log the M-Pesa response
-            print(f"M-Pesa API Response: {response}")
-
-            if 'errorCode' in response:
-                # Handle M-Pesa API error
-                error_message = response.get('errorMessage', 'M-Pesa service error')
-                db.session.delete(payment)
-                db.session.commit()
-                return jsonify({
-                    'success': False,
-                    'message': f"M-Pesa error: {error_message}",
-                    'error_type': 'mpesa_error'
-                }), 400
-
-            if 'CheckoutRequestID' not in response:
-                db.session.delete(payment)
-                db.session.commit()
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid M-Pesa response',
-                    'error_type': 'mpesa_error'
-                }), 500
-
-            # Update payment record with checkout request ID
-            payment.checkout_request_id = response['CheckoutRequestID']
-            db.session.commit()
-
-            return jsonify({
-                'success': True,
-                'message': 'Payment initiated. Please check your phone.',
-                'checkout_request_id': response['CheckoutRequestID']
-            })
-
-        except Exception as e:
-            # Log the specific M-Pesa error
-            print(f"M-Pesa API Error: {str(e)}")
-            db.session.delete(payment)
-            db.session.commit()
-            return jsonify({
-                'success': False,
-                'message': f'M-Pesa service error: {str(e)}',
-                'error_type': 'mpesa_error'
-            }), 500
-
-    except Exception as e:
-        # Log any other unexpected errors
-        print(f"Payment initiation error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f'Payment initiation failed: {str(e)}',
-            'error_type': 'system_error'
-        }), 500
 
 
 # Add this new route to your Flask application
@@ -1282,16 +998,10 @@ def update_quantity(order_item_id):
         return jsonify({'error': str(e)}), 500
 
 
-
-
-
-
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        # Start the payment checker in a background thread
-        payment_checker = threading.Thread(target=check_pending_payments, daemon=True)
-        payment_checker.start()
+
         # Create default roles if they don't exist
         if not Role.query.filter_by(name='admin').first():
             db.session.add(Role(name='admin'))

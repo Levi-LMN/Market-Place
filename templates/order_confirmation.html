@@ -18,7 +18,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="lock-icon">
                         <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
                     </svg>
-                    <span>Order #{{ order.id }}</span>
+                    <span>Order Reference: {{ order.reference_number }}</span>
                 </div>
             </div>
             <div class="card-body">
@@ -31,16 +31,71 @@
                         <span class="label">Status</span>
                         <span class="value status-badge">{{ order.status }}</span>
                     </div>
-                    <div class="status-row">
-                        <span class="label">Payment Method</span>
-                        <span class="value">{{ order.payment.payment_method }}</span>
-                    </div>
-                    {% if order.payment.mpesa_transaction_id %}
-                    <div class="status-row">
-                        <span class="label">M-Pesa Transaction ID</span>
-                        <span class="value">{{ order.payment.mpesa_transaction_id }}</span>
-                    </div>
-                    {% endif %}
+                    {% if order.status == "Awaiting Payment" %}
+                        <div class="payment-instructions">
+                            <h4>Payment Instructions</h4>
+                            <p>Please make your payment using the following details:</p>
+                            <ul>
+                                <li>M-Pesa Pay Bill: <strong>123456</strong></li>
+                                <li>Account Number: <strong>{{ order.reference_number }}</strong></li>
+                                <li>Amount: <strong>KES {{ "%.2f"|format(order.total_price) }}</strong></li>
+                            </ul>
+                            <p class="note">Use your order reference as the payment reference</p>
+                        </div>
+                        {% elif order.status == "Processing" %}
+                        <div class="status-message processing">
+                            <h4>Order Processing</h4>
+                            <div class="status-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                            </div>
+                            <p>Your payment has been received and we're preparing your order.</p>
+                            <p class="note">We'll update you once your order has been shipped.</p>
+                        </div>
+                        {% elif order.status == "Shipped" %}
+                        <div class="status-message shipped">
+                            <h4>Order Shipped</h4>
+                            <div class="status-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="1" y="3" width="15" height="13"></rect>
+                                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                </svg>
+                            </div>
+                            <p>Your order is on its way!</p>
+                            <p class="note">Expected delivery within 3-5 business days.</p>
+                        </div>
+                        {% elif order.status == "Delivered" %}
+                        <div class="status-message delivered">
+                            <h4>Order Delivered</h4>
+                            <div class="status-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                            </div>
+                            <p>Your order has been delivered successfully!</p>
+                            <p class="note">Thank you for shopping with us. We hope you enjoy your purchase!</p>
+                        </div>
+                        {% elif order.status == "Cancelled" %}
+                        <div class="status-message cancelled">
+                            <h4>Order Cancelled</h4>
+                            <div class="status-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p>This order has been cancelled.</p>
+                            <p class="note">If you have any questions, please contact our customer support.</p>
+                        </div>
+                        {% endif %}
+
+
                 </div>
             </div>
         </div>
@@ -83,7 +138,7 @@
                         <span class="text-success">Free</span>
                     </div>
                     <div class="summary-row total">
-                        <span>Total Paid</span>
+                        <span>Total</span>
                         <span class="total-amount">KES {{ "%.2f"|format(order.total_price) }}</span>
                     </div>
                 </div>
@@ -105,7 +160,6 @@
 </div>
 
 <style>
-/* Inherit existing styles from checkout page */
 .checkout-container {
     max-width: 1400px;
     margin: 0 auto;
@@ -133,7 +187,6 @@
     margin: 0;
 }
 
-/* Confirmation specific grid */
 .confirmation-grid {
     display: grid;
     grid-template-columns: 1fr 1.2fr;
@@ -141,11 +194,38 @@
     align-items: start;
 }
 
+.card {
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+                0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
 /* Status Card Styles */
 .status-details {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
 }
 
 .status-row {
@@ -173,6 +253,112 @@
     padding: 0.25rem 0.75rem;
     border-radius: 1rem;
     font-size: 0.875rem;
+}
+
+/* Payment Instructions */
+.payment-instructions {
+    background: #eff6ff;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid #bfdbfe;
+}
+
+.payment-instructions h4 {
+    color: #1e40af;
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+}
+
+.payment-instructions ul {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+.payment-instructions li {
+    margin-bottom: 0.75rem;
+    color: #1e40af;
+}
+
+.payment-instructions .note {
+    margin: 1rem 0 0 0;
+    font-size: 0.9rem;
+    color: #1e40af;
+    font-style: italic;
+}
+
+/* Items List Styles */
+.items-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #e2e8f0;
+    align-items: center;
+}
+
+.item:last-child {
+    border-bottom: none;
+}
+
+.item-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.item-details h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: #0f172a;
+}
+
+.item-meta {
+    display: flex;
+    gap: 1rem;
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.item-total {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+/* Summary Footer */
+.summary-footer {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    color: #64748b;
+}
+
+.summary-row.total {
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 2px solid #e2e8f0;
 }
 
 /* Continue Shopping Button */
@@ -208,34 +394,6 @@
     gap: 0.75rem;
 }
 
-/* Inherit remaining styles from checkout page */
-.card {
-    background: white;
-    border-radius: 1.5rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
-                0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    overflow: hidden;
-}
-
-.card-header {
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.card-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #0f172a;
-}
-
-.card-body {
-    padding: 2rem;
-}
-
 /* Responsive Adjustments */
 @media (max-width: 1024px) {
     .confirmation-grid {
@@ -252,6 +410,15 @@
 
     .page-header h1 {
         font-size: 2rem;
+    }
+
+    .item {
+        grid-template-columns: auto 1fr;
+    }
+
+    .item-total {
+        grid-column: span 2;
+        text-align: right;
     }
 }
 
@@ -270,6 +437,103 @@
         align-items: flex-start;
         gap: 0.5rem;
     }
+
+    .item {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .item-image {
+        width: 100%;
+        height: 200px;
+    }
+
+    .item-total {
+        grid-column: span 1;
+        text-align: left;
+    }
 }
 </style>
+
+<style>
+                        /* Add these styles to your existing CSS */
+                        .status-message {
+                            padding: 1.5rem;
+                            border-radius: 0.75rem;
+                            text-align: center;
+                        }
+
+                        .status-message h4 {
+                            margin: 0 0 1rem 0;
+                            font-size: 1.1rem;
+                            font-weight: 600;
+                        }
+
+                        .status-icon {
+                            margin: 1rem 0;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                        }
+
+                        .status-message p {
+                            margin: 0.5rem 0;
+                        }
+
+                        .status-message .note {
+                            font-size: 0.9rem;
+                            font-style: italic;
+                            margin-top: 1rem;
+                        }
+
+                        /* Status-specific styles */
+                        .status-message.processing {
+                            background-color: #fff7ed;
+                            border: 1px solid #fed7aa;
+                            color: #9a3412;
+                        }
+
+                        .status-message.shipped {
+                            background-color: #f0f9ff;
+                            border: 1px solid #bae6fd;
+                            color: #0369a1;
+                        }
+
+                        .status-message.delivered {
+                            background-color: #f0fdf4;
+                            border: 1px solid #bbf7d0;
+                            color: #166534;
+                        }
+
+                        .status-message.cancelled {
+                            background-color: #fef2f2;
+                            border: 1px solid #fecaca;
+                            color: #991b1b;
+                        }
+
+                        /* Status badge colors */
+                        .status-badge {
+                            background: #64748b;  /* Default color */
+                        }
+
+                        .status-badge.Awaiting.Payment {
+                            background: #eab308;
+                        }
+
+                        .status-badge.Processing {
+                            background: #f97316;
+                        }
+
+                        .status-badge.Shipped {
+                            background: #0ea5e9;
+                        }
+
+                        .status-badge.Delivered {
+                            background: #22c55e;
+                        }
+
+                        .status-badge.Cancelled {
+                            background: #ef4444;
+                        }
+                        </style>
 {% endblock %}
