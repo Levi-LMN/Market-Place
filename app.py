@@ -20,6 +20,12 @@ from flask import Flask, jsonify, request
 import os
 from urllib.parse import urljoin
 import sys
+from flask import Flask, jsonify, request
+import requests
+from requests.auth import HTTPBasicAuth
+import base64
+from datetime import datetime
+import json
 
 # Add these imports if not already present
 from datetime import datetime, timedelta
@@ -163,12 +169,7 @@ class EditUserForm(FlaskForm):
 
 
 
-from flask import Flask, jsonify, request
-import requests
-from requests.auth import HTTPBasicAuth
-import base64
-from datetime import datetime
-import json
+
 
 
 class MpesaC2bCredential:
@@ -760,61 +761,6 @@ def my_orders():
     return render_template('my_orders.html', orders=user_orders)
 
 
-# Add to your existing imports
-from datetime import datetime
-
-
-# Add new route before the checkout route
-@app.route('/checkout_page')
-def checkout_page():
-    if 'user_id' not in session:
-        flash('Please login to checkout.', 'warning')
-        return redirect(url_for('login'))
-
-    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
-    if not order:
-        flash('Your cart is empty.', 'info')
-        return redirect(url_for('view_cart'))
-
-    return render_template('checkout.html', order=order)
-
-
-# Modify existing checkout route
-@app.route('/checkout', methods=['POST'])
-def checkout():
-    if 'user_id' not in session:
-        flash('Please login to checkout.', 'warning')
-        return redirect(url_for('login'))
-
-    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
-    if not order:
-        flash('Your cart is empty.', 'info')
-        return redirect(url_for('view_cart'))
-
-    mpesa_transaction_id = request.form.get('mpesa_transaction_id')
-
-    if not mpesa_transaction_id:
-        flash('Please provide MPESA transaction ID.', 'danger')
-        return redirect(url_for('checkout_page'))
-
-    payment = Payment(
-        order_id=order.id,
-        payment_method="MPESA",
-        payment_status="Completed",
-        mpesa_transaction_id=mpesa_transaction_id
-    )
-    db.session.add(payment)
-    order.status = "Processing"
-
-    try:
-        db.session.commit()
-        flash('Order placed successfully!', 'success')
-        return redirect(url_for('order_confirmation', order_id=order.id))
-    except Exception as e:
-        db.session.rollback()
-        flash('Error processing order.', 'danger')
-        return redirect(url_for('checkout_page'))
-
 # Add to routes
 
 from datetime import datetime
@@ -880,6 +826,63 @@ def get_cart_unique_items():
 @app.context_processor
 def inject_cart_count():
     return dict(cart_count=get_cart_unique_items())
+
+
+
+# Add to your existing imports
+from datetime import datetime
+
+
+# Add new route before the checkout route
+@app.route('/checkout_page')
+def checkout_page():
+    if 'user_id' not in session:
+        flash('Please login to checkout.', 'warning')
+        return redirect(url_for('login'))
+
+    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+    if not order:
+        flash('Your cart is empty.', 'info')
+        return redirect(url_for('view_cart'))
+
+    return render_template('checkout.html', order=order)
+
+
+# Modify existing checkout route
+@app.route('/checkout', methods=['POST'])
+def checkout():
+    if 'user_id' not in session:
+        flash('Please login to checkout.', 'warning')
+        return redirect(url_for('login'))
+
+    order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
+    if not order:
+        flash('Your cart is empty.', 'info')
+        return redirect(url_for('view_cart'))
+
+    mpesa_transaction_id = request.form.get('mpesa_transaction_id')
+
+    if not mpesa_transaction_id:
+        flash('Please provide MPESA transaction ID.', 'danger')
+        return redirect(url_for('checkout_page'))
+
+    payment = Payment(
+        order_id=order.id,
+        payment_method="MPESA",
+        payment_status="Completed",
+        mpesa_transaction_id=mpesa_transaction_id
+    )
+    db.session.add(payment)
+    order.status = "Processing"
+
+    try:
+        db.session.commit()
+        flash('Order placed successfully!', 'success')
+        return redirect(url_for('order_confirmation', order_id=order.id))
+    except Exception as e:
+        db.session.rollback()
+        flash('Error processing order.', 'danger')
+        return redirect(url_for('checkout_page'))
 
 
 

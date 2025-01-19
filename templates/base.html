@@ -356,6 +356,106 @@
         {% endblock %}
     </div>
 
+    <!-- Footer -->
+<footer class="footer mt-auto py-5" style="background-color: white; border-top: 1px solid rgba(229, 231, 235, 0.5);">
+    <div class="container">
+        <div class="row g-4">
+            <!-- Company Info -->
+            <div class="col-lg-4 col-md-6">
+                <h5 class="mb-4 fw-bold" style="color: var(--primary-color);">Market Place</h5>
+                <p class="text-muted mb-4">Your one-stop destination for quality products and exceptional shopping experience. Discover the difference with our curated marketplace.</p>
+                <div class="d-flex gap-3">
+                    <a href="#" class="text-secondary hover-primary">
+                        <i class="bi bi-facebook fs-5"></i>
+                    </a>
+                    <a href="#" class="text-secondary hover-primary">
+                        <i class="bi bi-twitter fs-5"></i>
+                    </a>
+                    <a href="#" class="text-secondary hover-primary">
+                        <i class="bi bi-instagram fs-5"></i>
+                    </a>
+                    <a href="#" class="text-secondary hover-primary">
+                        <i class="bi bi-linkedin fs-5"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="col-lg-2 col-md-6">
+                <h6 class="mb-4 fw-semibold">Quick Links</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">About Us</a></li>
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">Contact</a></li>
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">FAQs</a></li>
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">Privacy Policy</a></li>
+                </ul>
+            </div>
+
+            <!-- Customer Service -->
+            <div class="col-lg-2 col-md-6">
+                <h6 class="mb-4 fw-semibold">Customer Service</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">Shipping Info</a></li>
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">Returns</a></li>
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">Order Status</a></li>
+                    <li class="mb-2"><a href="#" class="text-secondary text-decoration-none hover-primary">Payment Options</a></li>
+                </ul>
+            </div>
+
+            <!-- Developer Section -->
+            <div class="col-lg-4 col-md-6">
+                <div class="p-4 rounded-3" style="background-color: var(--background-light);">
+                    <h6 class="mb-3 fw-semibold">Developed by</h6>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center"
+                             style="width: 48px; height: 48px; background-color: var(--primary-color);">
+                            <span class="text-white fw-bold">LMN</span>
+                        </div>
+                        <div>
+                            <h6 class="mb-1 fw-bold">LMN Technologies</h6>
+                            <p class="mb-0 text-secondary small">Crafting Digital Excellence</p>
+                        </div>
+                    </div>
+                    <p class="mb-3 text-secondary small">Specialized in creating robust e-commerce solutions and digital experiences that drive business growth.</p>
+                    <a href="#" class="btn btn-primary btn-sm">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Learn More
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar -->
+        <div class="row mt-5 pt-4 border-top">
+            <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
+                <p class="text-secondary mb-0">&copy; 2025 Market Place. All rights reserved.</p>
+            </div>
+            <div class="col-md-6 text-center text-md-end">
+                <p class="text-secondary mb-0">Powered by <a href="#" class="text-primary text-decoration-none">LMN Technologies</a></p>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .hover-primary:hover {
+            color: var(--primary-color) !important;
+            transition: color 0.2s ease;
+        }
+
+        .footer a:hover {
+            transform: translateY(-1px);
+            transition: transform 0.2s ease;
+        }
+
+        .footer .bi {
+            transition: transform 0.2s ease;
+        }
+
+        .footer .bi:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</footer>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 </body>

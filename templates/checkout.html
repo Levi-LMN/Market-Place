@@ -269,116 +269,200 @@
 </style>
 
 <script>
-document.getElementById('paymentForm').addEventListener('submit', function(e) {
+
+    document.getElementById('paymentForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     const payButton = document.getElementById('payButton');
     const statusDiv = document.getElementById('paymentStatus');
     const messageDiv = statusDiv.querySelector('.alert');
+    const phoneNumber = document.getElementById('phone_number').value;
 
+    // Disable form and show initial status
     payButton.disabled = true;
     payButton.innerHTML = '<i class="bi bi-arrow-repeat"></i> Processing...';
     statusDiv.style.display = 'block';
-
     messageDiv.className = 'alert';
     messageDiv.innerHTML = '<p>Initiating payment...</p>';
 
+    // Initialize payment
     fetch('/initiate_payment', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-            'phone_number': document.getElementById('phone_number').value
+            'phone_number': phoneNumber
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             messageDiv.className = 'alert alert-info';
-            messageDiv.innerHTML = '<p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>' +
-                                 '<p>Waiting for payment confirmation...</p>';
-            pollPaymentStatus(data.checkout_request_id);
+            messageDiv.innerHTML = `
+                <p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>
+                <p>Waiting for payment confirmation...</p>
+                <p><small>Phone number: ${phoneNumber}</small></p>
+            `;
+            startPaymentStatusPolling(data.checkout_request_id);
         } else {
-            messageDiv.className = 'alert alert-danger';
-            let errorMessage = data.message;
-
-            // Customize message based on error type
-            switch(data.error_type) {
-                case 'auth_error':
-                    errorMessage = 'Please log in to continue with checkout.';
-                    break;
-                case 'validation_error':
-                    errorMessage = `Invalid input: ${data.message}`;
-                    break;
-                case 'mpesa_error':
-                    errorMessage = `M-Pesa service error: ${data.message}`;
-                    break;
-            }
-
-            messageDiv.innerHTML = `<p><strong>Error:</strong> ${errorMessage}</p>`;
-            payButton.disabled = false;
-            payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
+            handlePaymentError(data, payButton, messageDiv);
         }
     })
-    .catch(error => {
-        console.error('Error:', error);
-        messageDiv.className = 'alert alert-danger';
-        messageDiv.innerHTML = '<p><strong>System Error:</strong> Unable to process payment. Please try again.</p>';
-        payButton.disabled = false;
-        payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
-    });
+    .catch(error => handleSystemError(error, payButton, messageDiv));
 });
 
-function pollPaymentStatus(checkoutRequestId) {
+function startPaymentStatusPolling(checkoutRequestId) {
     const statusDiv = document.getElementById('paymentStatus');
     const messageDiv = statusDiv.querySelector('.alert');
     const payButton = document.getElementById('payButton');
     let attempts = 0;
-    const maxAttempts = 60; // Poll for 5 minutes maximum
+    const maxAttempts = 60; // 5 minutes maximum
+    const pollInterval = 3000; // Poll every 3 seconds instead of 5
 
-    messageDiv.className = 'alert';
-    messageDiv.innerHTML = '<p>Payment initiated! Please check your phone for the M-Pesa prompt.</p>' +
-                          '<p>Waiting for payment confirmation...</p>';
-
-    const pollInterval = setInterval(() => {
+    const pollTimer = setInterval(() => {
         attempts++;
+
         fetch(`/check_payment_status/${checkoutRequestId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'Completed') {
-                    clearInterval(pollInterval);
-                    messageDiv.className = 'alert alert-success';
-                    messageDiv.innerHTML = '<p>Payment successful! Redirecting to order confirmation...</p>';
-                    setTimeout(() => {
-                        window.location.href = `/order_confirmation/${data.order_id}`;
-                    }, 2000);
-                } else if (data.status === 'Failed') {
-                    clearInterval(pollInterval);
-                    messageDiv.className = 'alert alert-danger';
-                    messageDiv.innerHTML = `<p><strong>Payment Failed:</strong> ${data.message}</p>` +
-                                         '<p>Please try again or use a different phone number.</p>';
-                    payButton.disabled = false;
-                    payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
-                } else if (attempts >= maxAttempts) {
-                    clearInterval(pollInterval);
-                    messageDiv.className = 'alert alert-warning';
-                    messageDiv.innerHTML = '<p>Payment status check timed out.</p>' +
-                                         '<p>If you completed the payment, please contact support.</p>';
-                    payButton.disabled = false;
-                    payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
-                } else {
-                    messageDiv.innerHTML = '<p>Waiting for payment confirmation...</p>' +
-                                         '<p>Please complete the payment on your phone if you haven\'t already.</p>';
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                return response.json();
+            })
+            .then(data => {
+                updatePaymentStatus(data, {
+                    messageDiv,
+                    payButton,
+                    pollTimer,
+                    attempts,
+                    maxAttempts,
+                    checkoutRequestId
+                });
             })
             .catch(error => {
-                console.error('Error:', error);
-                messageDiv.className = 'alert alert-warning';
-                messageDiv.innerHTML = '<p>Error checking payment status.</p>' +
-                                     '<p>Please wait or contact support if you\'ve completed the payment.</p>';
+                console.error('Polling error:', error);
+                // Don't stop polling on network errors unless max attempts reached
+                if (attempts >= maxAttempts) {
+                    clearInterval(pollTimer);
+                    handlePollingError(messageDiv, payButton);
+                }
             });
-    }, 5000);
+    }, pollInterval);
+
+    // Store the timer ID to clear it if needed
+    window.currentPollTimer = pollTimer;
 }
+
+function updatePaymentStatus(data, options) {
+    const { messageDiv, payButton, pollTimer, attempts, maxAttempts } = options;
+
+    switch(data.status) {
+        case 'Completed':
+            clearInterval(pollTimer);
+            messageDiv.className = 'alert alert-success';
+            messageDiv.innerHTML = `
+                <p><strong>Payment Successful!</strong></p>
+                <p>Transaction ID: ${data.transaction_id || 'Processing'}</p>
+                <p>Redirecting to order confirmation...</p>
+            `;
+            setTimeout(() => {
+                window.location.href = `/order_confirmation/${data.order_id}`;
+            }, 2000);
+            break;
+
+        case 'Failed':
+            clearInterval(pollTimer);
+            messageDiv.className = 'alert alert-danger';
+            messageDiv.innerHTML = `
+                <p><strong>Payment Failed</strong></p>
+                <p>${data.message || 'Please try again or use a different phone number.'}</p>
+            `;
+            resetPayButton(payButton);
+            break;
+
+        case 'Pending':
+            if (attempts >= maxAttempts) {
+                clearInterval(pollTimer);
+                handleTimeout(messageDiv, payButton);
+            } else {
+                updatePendingStatus(messageDiv, attempts);
+            }
+            break;
+
+        default:
+            // Keep polling but update the message
+            messageDiv.className = 'alert alert-warning';
+            messageDiv.innerHTML = `
+                <p>Checking payment status...</p>
+                <p>Please complete the payment on your phone if you haven't already.</p>
+            `;
+    }
+}
+
+function updatePendingStatus(messageDiv, attempts) {
+    const dots = '.'.repeat((attempts % 3) + 1);
+    messageDiv.innerHTML = `
+        <p>Waiting for payment confirmation${dots}</p>
+        <p>Please complete the payment on your phone if you haven't already.</p>
+        <p><small>You can safely close this window after payment. We'll email you the confirmation.</small></p>
+    `;
+}
+
+function handleTimeout(messageDiv, payButton) {
+    messageDiv.className = 'alert alert-warning';
+    messageDiv.innerHTML = `
+        <p><strong>Status Check Timeout</strong></p>
+        <p>If you completed the payment, please check your email for confirmation.</p>
+        <p>If you haven't paid yet, you can try again or contact support.</p>
+    `;
+    resetPayButton(payButton);
+}
+
+function handlePaymentError(data, payButton, messageDiv) {
+    messageDiv.className = 'alert alert-danger';
+    const errorMessage = getErrorMessage(data);
+    messageDiv.innerHTML = `<p><strong>Error:</strong> ${errorMessage}</p>`;
+    resetPayButton(payButton);
+}
+
+function handleSystemError(error, payButton, messageDiv) {
+    console.error('System Error:', error);
+    messageDiv.className = 'alert alert-danger';
+    messageDiv.innerHTML = `
+        <p><strong>System Error:</strong> Unable to process payment.</p>
+        <p>Please try again or contact support if the problem persists.</p>
+    `;
+    resetPayButton(payButton);
+}
+
+function handlePollingError(messageDiv, payButton) {
+    messageDiv.className = 'alert alert-warning';
+    messageDiv.innerHTML = `
+        <p><strong>Connection Error</strong></p>
+        <p>Unable to check payment status. If you completed the payment, please check your email for confirmation.</p>
+        <p>You can try again or contact support if needed.</p>
+    `;
+    resetPayButton(payButton);
+}
+
+function resetPayButton(payButton) {
+    payButton.disabled = false;
+    payButton.innerHTML = '<i class="bi bi-credit-card"></i> Pay with M-Pesa';
+}
+
+function getErrorMessage(data) {
+    switch(data.error_type) {
+        case 'auth_error':
+            return 'Please log in to continue with checkout.';
+        case 'validation_error':
+            return `Invalid input: ${data.message}`;
+        case 'mpesa_error':
+            return `M-Pesa service error: ${data.message}`;
+        default:
+            return data.message || 'An unexpected error occurred.';
+    }
+}
+
 </script>
 {% endblock %}
