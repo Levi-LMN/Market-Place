@@ -1,7 +1,7 @@
 
 <!DOCTYPE html>
 <html lang="en">
-
+<!--base html-->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -265,6 +265,9 @@
                             <i class="bi bi-person-circle me-1"></i>{{ session.get('user_name') }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}">
+                                <i class="bi bi-person me-2"></i>Profile</a>
+                            </li>
                             <li><a class="dropdown-item" href="{{ url_for('my_orders') }}">
                                 <i class="bi bi-clock-history me-2"></i>My Orders</a>
                             </li>
@@ -282,6 +285,7 @@
                     </li>
                     {% endif %}
                 </ul>
+
             </div>
         </div>
     </nav>

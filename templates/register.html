@@ -1,282 +1,211 @@
-{% extends 'base.html' %}
-
-{% block title %}Register{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
-<div class="checkout-container">
-    <div class="page-header">
-        <h1>Create Account</h1>
-        <p class="subtitle">Join us to start shopping</p>
-    </div>
+<!-- Tailwind CSS and Custom Fonts -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <div class="auth-container">
-        <div class="card auth-card">
-            <div class="card-header">
-                <h3>Register</h3>
-                <div class="secure-badge">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="lock-icon">
-                        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-                    </svg>
-                    <span>Secure Registration</span>
+<style>
+  body {
+    font-family: 'Inter', sans-serif;
+  }
+  .password-toggle {
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  .password-toggle:hover {
+    color: #6B46C1;
+  }
+  .password-strength {
+    height: 4px;
+    transition: width 0.3s ease;
+  }
+</style>
+
+<!-- Registration Section -->
+<div class="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-purple-600 py-6 px-8">
+            <h2 class="text-2xl font-bold text-white text-center">Create Your Account</h2>
+            <p class="text-purple-200 text-center mt-2">Join our community of satisfied customers</p>
+        </div>
+
+        <!-- Form -->
+        <div class="p-8">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Left Column -->
+                    <div class="space-y-6">
+                        <!-- Name Field -->
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <div class="mt-1">
+                                {{ form.name(class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500", placeholder="Enter your full name") }}
+                            </div>
+                        </div>
+
+                        <!-- Email Field -->
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                            <div class="mt-1">
+                                {{ form.email(class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500", placeholder="you@example.com") }}
+                            </div>
+                        </div>
+
+                        <!-- Password Field -->
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                            <div class="mt-1 relative">
+                                <input type="password" id="password" name="password" class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500" placeholder="••••••••">
+                                <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center" onclick="togglePassword('password')">
+                                    <svg class="h-5 w-5 text-gray-400 password-toggle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <!-- Password Strength Indicator -->
+                            <div class="mt-2">
+                                <div class="bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="password-strength bg-red-500 h-1" style="width: 0%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Password strength: <span class="password-strength-text">Weak</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div class="space-y-6">
+                        <!-- Confirm Password Field -->
+                        <div>
+                            <label for="confirm_password" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                            <div class="mt-1 relative">
+                                <input type="password" id="confirm_password" name="confirm_password" class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500" placeholder="••••••••">
+                                <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center" onclick="togglePassword('confirm_password')">
+                                    <svg class="h-5 w-5 text-gray-400 password-toggle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="password-match-message text-xs text-gray-500 mt-1">Passwords must match</p>
+                        </div>
+
+                        <!-- Phone Number Field -->
+                        <div>
+                            <label for="phone_number" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                            <div class="mt-1 flex rounded-lg shadow-sm">
+                                <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                                    +254
+                                </span>
+                                {{ form.phone_number(class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-lg border border-gray-300 focus:ring-purple-500 focus:border-purple-500", placeholder="7XX XXX XXX") }}
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Enter your M-Pesa registered number</p>
+                        </div>
+
+                        <!-- Terms and Conditions -->
+                        <div class="flex items-center">
+                            <input type="checkbox" id="terms" name="terms" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                            <label for="terms" class="ml-2 block text-sm text-gray-700">
+                                I agree to the <a href="#" class="text-purple-600 hover:text-purple-500">Terms and Conditions</a> and <a href="#" class="text-purple-600 hover:text-purple-500">Privacy Policy</a>
+                            </label>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body">
-                <form method="POST" class="auth-form">
-                    {{ form.hidden_tag() }}
 
-                    <div class="form-group">
-                        <label for="name">Full Name</label>
-                        <div class="input-wrapper">
-                            {{ form.name(class="form-control", placeholder="Enter your full name") }}
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="email">Email Address</label>
-                        <div class="input-wrapper">
-                            {{ form.email(class="form-control", placeholder="Enter your email") }}
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <div class="input-wrapper">
-                            {{ form.password(class="form-control", placeholder="Choose a strong password") }}
-                        </div>
-                        <small class="helper-text">Use at least 8 characters with letters and numbers</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="phone_number">Phone Number</label>
-                        <div class="input-wrapper">
-                            <span class="prefix">+254</span>
-                            {{ form.phone_number(class="form-control", placeholder="7XX XXX XXX") }}
-                        </div>
-                        <small class="helper-text">Enter your M-Pesa registered number</small>
-                    </div>
-
-                    <button type="submit" class="auth-button">
-                        <span class="button-content">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M8 1.5a3.5 3.5 0 0 0-3.5 3.5v.5h7v-.5A3.5 3.5 0 0 0 8 1.5zm-4 4V5H1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5h-3v.5a.5.5 0 0 1-1 0V5H5v.5a.5.5 0 0 1-1 0z"/>
-                            </svg>
-                            <span>Create Account</span>
-                        </span>
+                <!-- Submit Button -->
+                <div class="mt-6">
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300">
+                        Create Account
                     </button>
-                </form>
-
-                <div class="auth-footer">
-                    <p>Already have an account? <a href="{{ url_for('login') }}" class="auth-link">Login here</a></p>
                 </div>
+            </form>
+
+            <!-- Login Link -->
+            <div class="mt-6 text-center">
+                <p class="text-sm text-gray-600">
+                    Already have an account?
+                    <a href="{{ url_for('login') }}" class="font-medium text-purple-600 hover:text-purple-500">
+                        Sign in here
+                    </a>
+                </p>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-/* Inherit existing container styles */
-.checkout-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 3rem 2rem;
-    background: #f8fafc;
-    min-height: 100vh;
-    font-family: system-ui, -apple-system, sans-serif;
-}
+<!-- JavaScript for Password Toggle and Validation -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Updated Password toggle functionality
+    window.togglePassword = function(inputId) {
+        const input = document.getElementById(inputId);
+        const button = input.nextElementSibling;
+        const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+        input.setAttribute('type', type);
 
-.page-header {
-    text-align: center;
-    margin-bottom: 3rem;
-}
+        const svg = button.querySelector('svg');
+        if (type === 'text') {
+            svg.innerHTML = `
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+            `;
+        } else {
+            svg.innerHTML = `
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            `;
+        }
+    };
 
-.page-header h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 0.5rem 0;
-}
+    // Password strength checker
+    const checkPasswordStrength = (password) => {
+        let strength = 0;
+        if (password.length >= 8) strength++;
+        if (password.match(/[a-z]/)) strength++;
+        if (password.match(/[A-Z]/)) strength++;
+        if (password.match(/[0-9]/)) strength++;
+        if (password.match(/[^a-zA-Z0-9]/)) strength++;
+        return strength;
+    };
 
-.subtitle {
-    color: #64748b;
-    font-size: 1.125rem;
-    margin: 0;
-}
+    // Password strength indicator
+    const passwordInput = document.getElementById('password');
+    const strengthIndicator = document.querySelector('.password-strength');
+    const strengthText = document.querySelector('.password-strength-text');
 
-/* Auth Container */
-.auth-container {
-    max-width: 500px;
-    margin: 0 auto;
-}
+    passwordInput.addEventListener('input', function() {
+        const strength = checkPasswordStrength(this.value);
+        const width = (strength / 5) * 100;
+        strengthIndicator.style.width = `${width}%`;
 
-/* Card Styles */
-.card {
-    background: white;
-    border-radius: 1.5rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
-                0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    overflow: hidden;
-}
+        if (strength < 2) {
+            strengthIndicator.className = 'password-strength bg-red-500 h-1';
+            strengthText.textContent = 'Weak';
+        } else if (strength < 4) {
+            strengthIndicator.className = 'password-strength bg-yellow-500 h-1';
+            strengthText.textContent = 'Medium';
+        } else {
+            strengthIndicator.className = 'password-strength bg-green-500 h-1';
+            strengthText.textContent = 'Strong';
+        }
+    });
 
-.card-header {
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+    // Password confirmation checker
+    const confirmInput = document.getElementById('confirm_password');
+    const matchMessage = document.querySelector('.password-match-message');
 
-.card-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #0f172a;
-}
-
-.card-body {
-    padding: 2rem;
-}
-
-/* Form Styles */
-.auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.form-group label {
-    font-weight: 500;
-    color: #0f172a;
-}
-
-.input-wrapper {
-    display: flex;
-    align-items: center;
-    background: #f8fafc;
-    border-radius: 1rem;
-    border: 2px solid #e2e8f0;
-    transition: all 0.2s;
-}
-
-.input-wrapper:focus-within {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.prefix {
-    padding: 0.75rem 1rem;
-    color: #64748b;
-    font-weight: 500;
-    border-right: 2px solid #e2e8f0;
-}
-
-.form-control {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-    color: #0f172a;
-    width: 100%;
-}
-
-.form-control:focus {
-    outline: none;
-}
-
-.helper-text {
-    color: #64748b;
-    font-size: 0.875rem;
-}
-
-/* Auth Button */
-.auth-button {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    padding: 1rem 1.5rem;
-    background: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 1rem;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 1rem;
-}
-
-.auth-button:hover {
-    background: #1d4ed8;
-    transform: translateY(-2px);
-}
-
-.button-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-/* Auth Footer */
-.auth-footer {
-    margin-top: 2rem;
-    text-align: center;
-    color: #64748b;
-}
-
-.auth-link {
-    color: #2563eb;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.auth-link:hover {
-    text-decoration: underline;
-}
-
-/* Secure Badge */
-.secure-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #059669;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.lock-icon {
-    width: 1rem;
-    height: 1rem;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 640px) {
-    .checkout-container {
-        padding: 2rem 1rem;
-    }
-
-    .page-header h1 {
-        font-size: 2rem;
-    }
-
-    .card {
-        border-radius: 1rem;
-    }
-
-    .card-header,
-    .card-body {
-        padding: 1.5rem;
-    }
-
-    .input-wrapper {
-        flex-direction: row;
-    }
-}
-</style>
+    confirmInput.addEventListener('input', function() {
+        if (this.value === passwordInput.value) {
+            matchMessage.textContent = 'Passwords match';
+            matchMessage.className = 'password-match-message text-xs text-green-500 mt-1';
+        } else {
+            matchMessage.textContent = 'Passwords do not match';
+            matchMessage.className = 'password-match-message text-xs text-red-500 mt-1';
+        }
+    });
+});
+</script>
 {% endblock %}

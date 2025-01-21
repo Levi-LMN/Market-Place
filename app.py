@@ -28,11 +28,23 @@ from datetime import datetime
 import json
 import random
 from enum import Enum
-
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate, make_msgid
+import dns.resolver
+import socket
 # Add these imports if not already present
 from datetime import datetime, timedelta
 import threading
 import time
+# Add these imports if not already present
+from datetime import datetime, timedelta
+import secrets
+
+# Add these imports at the top
+from flask_mail import Mail, Message
+import secrets
+from datetime import datetime, timedelta
 
 UPLOAD_FOLDER = 'static/uploads'
 app = Flask(__name__)
@@ -44,6 +56,28 @@ app.config['WTF_CSRF_ENABLED'] = True
 SITE_URL = 'https://levishub.pythonanywhere.com'
 db = SQLAlchemy(app)
 
+# Configure Flask-Mail
+mail = Mail(app)
+
+# Email configuration with DMARC, SPF, and DKIM best practices
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = 'lmnvault@gmail.com'
+app.config['MAIL_PASSWORD'] = 'gxep ombk wdzb urzg'
+app.config['MAIL_DEFAULT_SENDER'] = ('LevisHub Store', 'lmnvault@gmail.com')
+app.config['MAIL_MAX_EMAILS'] = 100
+
+# Configure additional headers
+app.config['MAIL_HEADERS'] = {
+    'List-Unsubscribe': '<mailto:unsubscribe@levishub.pythonanywhere.com>',
+    'Precedence': 'bulk',
+    'X-Auto-Response-Suppress': 'OOF, AutoReply',
+    'Auto-Submitted': 'auto-generated'
+}
+mail.init_app(app)
+
 
 # Models
 class Role(db.Model):
@@ -53,6 +87,7 @@ class Role(db.Model):
     users = db.relationship('User', backref='role', lazy=True)
 
 
+# Update User model with verification fields
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -62,6 +97,12 @@ class User(db.Model):
     phone_number = db.Column(db.String(15), nullable=False)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     orders = db.relationship('Order', backref='user', lazy=True)
+    # Add new fields for email verification
+    email_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), unique=True, nullable=True)
+    token_expiry = db.Column(db.DateTime, nullable=True)
+    reset_password_token = db.Column(db.String(100), unique=True, nullable=True)
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)
 
 
 class ProductImage(db.Model):
@@ -71,9 +112,6 @@ class ProductImage(db.Model):
     image_url = db.Column(db.String(200), nullable=False)
 
 
-
-
-
 class OrderStatus(Enum):
     AWAITING_PAYMENT = "Awaiting Payment"
     PROCESSING = "Processing"
@@ -81,6 +119,7 @@ class OrderStatus(Enum):
     DELIVERED = "Delivered"
     CANCELLED = "Cancelled"
     PENDING = "Pending"
+
 
 class Order(db.Model):
     __tablename__ = 'orders'
@@ -105,6 +144,7 @@ class Order(db.Model):
             OrderStatus.PENDING.value: "bg-gray-500"
         }
         return status_colors.get(self.status, "bg-gray-500")
+
 
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
@@ -168,6 +208,7 @@ class ProductForm(FlaskForm):
     images = FileField('Images', validators=[FileAllowed(['jpg', 'png', 'jpeg'])])
     submit = SubmitField('Submit')
 
+
 # Forms
 class RegistrationForm(FlaskForm):
     name = StringField('Name', validators=[DataRequired()])
@@ -191,8 +232,30 @@ class EditUserForm(FlaskForm):
     submit = SubmitField('Update')
 
 
+# Add these new forms to your existing forms
+class ChangePasswordForm(FlaskForm):
+    current_password = PasswordField('Current Password', validators=[DataRequired()])
+    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), Length(min=6)])
+    submit = SubmitField('Change Password')
 
 
+class EditProfileForm(FlaskForm):
+    name = StringField('Name', validators=[DataRequired()])
+    phone_number = StringField('Phone Number', validators=[DataRequired()])
+    submit = SubmitField('Update Profile')
+
+
+
+# Add to your forms
+class ForgotPasswordForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Reset Password')
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), Length(min=6)])
+    submit = SubmitField('Reset Password')
 
 
 class MpesaC2bCredential:
@@ -224,6 +287,7 @@ class MpesaAccessToken:
             if hasattr(e.response, 'text'):
                 print(f"M-Pesa error response: {e.response.text}")
             raise Exception(f"Failed to get M-Pesa access token: {str(e)}")
+
 
 class LipaNaMpesaOnline:
     def __init__(self):
@@ -276,8 +340,6 @@ class LipaNaMpesaOnline:
             raise Exception(f"Failed to initiate M-Pesa payment: {str(e)}")
 
 
-
-
 # Admin Required Decorator
 def admin_required(f):
     from functools import wraps
@@ -322,27 +384,173 @@ def home():
                            products=products)
 
 
+def verify_email_domain(email):
+    """Verify if email domain exists and has valid MX records"""
+    try:
+        domain = email.split('@')[1]
+        # Check if MX record exists
+        mx_records = dns.resolver.resolve(domain, 'MX')
+        # Try to resolve the hostname
+        socket.gethostbyname(domain)
+        return True
+    except:
+        return False
 
+
+def send_verification_email(user):
+    """Send verification email with improved deliverability"""
+    try:
+        # Generate secure token
+        token = secrets.token_urlsafe(32)
+        user.verification_token = token
+        user.token_expiry = datetime.utcnow() + timedelta(hours=24)
+        db.session.commit()
+
+        # Create base URL
+        if request.headers.get('X-Forwarded-Proto'):
+            base_url = request.headers.get('X-Forwarded-Proto') + '://' + request.headers.get('X-Forwarded-Host',
+                                                                                              request.host)
+        else:
+            base_url = request.host_url.rstrip('/')
+
+        verification_url = urljoin(base_url, url_for('verify_email', token=token, _external=False))
+
+        # Create email message using Flask-Mail
+        msg = Message(
+            subject='Verify Your LevisHub Store Account',
+            sender=('LevisHub Store', 'lmnvault@gmail.com'),
+            recipients=[user.email],
+            # Add extra headers for better deliverability
+            extra_headers={
+                'List-Unsubscribe': f'<mailto:unsubscribe@{request.host}>',
+                'Precedence': 'bulk',
+                'X-Auto-Response-Suppress': 'OOF, AutoReply',
+                'Auto-Submitted': 'auto-generated'
+            }
+        )
+
+        # Set plain text body
+        msg.body = f"""
+        Hi {user.name},
+
+        Welcome to LevisHub Store! Please verify your email address to complete your registration.
+
+        Click here to verify your email: {verification_url}
+
+        This link will expire in 24 hours.
+
+        If you didn't create an account with us, please ignore this email.
+
+        Best regards,
+        The LevisHub Store Team
+
+        ---
+        This is an automated message, please do not reply.
+        To unsubscribe from these emails, visit: {base_url}/unsubscribe
+        """
+
+        # Set HTML body
+        msg.html = render_template('email/verify_email.html',
+                                   user=user,
+                                   verification_url=verification_url,
+                                   base_url=base_url)
+
+        # Send the email
+        mail.send(msg)
+        return True
+
+    except Exception as e:
+        print(f"Error sending verification email: {e}")
+        db.session.rollback()  # Rollback token changes if email fails
+        return False
+
+
+@app.route('/verify-email/<token>')
+def verify_email(token):
+    """Handle email verification"""
+    if not token:
+        flash('Invalid verification link.', 'danger')
+        return redirect(url_for('login'))
+
+    # Find user with matching token
+    user = User.query.filter_by(verification_token=token).first()
+
+    if not user:
+        flash('Invalid verification link.', 'danger')
+        return redirect(url_for('login'))
+
+    # Check if token has expired
+    if user.token_expiry and user.token_expiry < datetime.utcnow():
+        flash('Verification link has expired. Please request a new one.', 'danger')
+        return redirect(url_for('login'))
+
+    try:
+        # Mark email as verified and clear token
+        user.email_verified = True
+        user.verification_token = None
+        user.token_expiry = None
+        db.session.commit()
+
+        flash('Email verified successfully! You can now log in.', 'success')
+        return redirect(url_for('login'))
+    except Exception as e:
+        db.session.rollback()
+        flash('Error verifying email. Please try again.', 'danger')
+        print(f"Error verifying email: {e}")
+        return redirect(url_for('login'))
+
+
+# Add route to resend verification email
+@app.route('/resend-verification')
+def resend_verification():
+    """Resend verification email to logged-in user"""
+    if 'user_id' not in session:
+        flash('Please log in first.', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('User not found.', 'danger')
+        return redirect(url_for('login'))
+
+    if user.email_verified:
+        flash('Email is already verified.', 'info')
+        return redirect(url_for('home'))
+
+    if send_verification_email(user):
+        flash('Verification email sent! Please check your inbox.', 'success')
+    else:
+        flash('Error sending verification email. Please try again.', 'danger')
+
+    return redirect(url_for('login'))
+
+
+# Update registration route
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_password = generate_password_hash(form.password.data)
         user_role = Role.query.filter_by(
-            name='admin' if form.email.data == 'admin@levisstore.com' else 'customer').first()
+            name='admin' if form.email.data == 'mukuhalevi@gmail.com' else 'customer').first()
 
         new_user = User(
             name=form.name.data,
             email=form.email.data,
             password_hash=hashed_password,
             phone_number=form.phone_number.data,
-            role_id=user_role.id
+            role_id=user_role.id,
+            email_verified=False
         )
 
         try:
             db.session.add(new_user)
             db.session.commit()
-            flash('Account created successfully!', 'success')
+
+            # Send verification email
+            send_verification_email(new_user)
+
+            flash('Account created successfully! Please check your email to verify your account.', 'success')
             return redirect(url_for('login'))
         except IntegrityError:
             db.session.rollback()
@@ -351,12 +559,17 @@ def register():
     return render_template('register.html', form=form)
 
 
+from sqlalchemy import func
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
+        # Case-insensitive email matching
+        user = User.query.filter(func.lower(User.email) == form.email.data.lower()).first()
         if user and check_password_hash(user.password_hash, form.password.data):
+            # Allow login even if email is not verified
             session['user_id'] = user.id
             session['user_name'] = user.name
             session['user_role'] = user.role.name
@@ -394,6 +607,7 @@ def products():
                            categories=categories,
                            selected_category=selected_category)
 
+
 # Update the product_detail route to include category information
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
@@ -414,7 +628,6 @@ def product_detail(product_id):
         existing_order_item=existing_order_item,
         images=serialized_images
     )
-
 
 
 # Add these new routes for category management
@@ -598,6 +811,7 @@ def edit_product(product_id):
     # Pass both form and product to template
     return render_template('edit_product.html', form=form, product=product)
 
+
 @app.route('/admin/delete_product/<int:product_id>', methods=['POST'])
 @admin_required
 def delete_product(product_id):
@@ -633,6 +847,7 @@ def delete_product(product_id):
         flash('Error deleting product. Please try again.', 'danger')
 
     return redirect(url_for('manage_products'))
+
 
 @app.route('/cart')
 def view_cart():
@@ -721,10 +936,6 @@ def remove_from_cart(order_item_id):
     return redirect(url_for('view_cart'))
 
 
-
-
-
-
 @app.route('/admin/manage_products')
 @admin_required
 def manage_products():
@@ -737,7 +948,6 @@ def manage_products():
 def manage_users():
     users = User.query.all()
     return render_template('manage_users.html', users=users)
-
 
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
@@ -766,6 +976,7 @@ def edit_user(user_id):
             print(f"Database error: {e}")
 
     return render_template('edit_user.html', form=form, user=user)
+
 
 @app.route('/my_orders')
 def my_orders():
@@ -837,6 +1048,7 @@ def update_order_status(order_id):
 
     return redirect(url_for('manage_orders'))
 
+
 def get_cart_unique_items():
     if 'user_id' in session:
         order = Order.query.filter_by(user_id=session['user_id'], status="Pending").first()
@@ -844,10 +1056,10 @@ def get_cart_unique_items():
             return OrderItem.query.filter_by(order_id=order.id).count()
     return 0
 
+
 @app.context_processor
 def inject_cart_count():
     return dict(cart_count=get_cart_unique_items())
-
 
 
 # Add to your existing imports
@@ -927,6 +1139,7 @@ def checkout():
         flash('Error processing order.', 'danger')
         return redirect(url_for('checkout_page'))
 
+
 @app.route('/order_confirmation/<int:order_id>')
 def order_confirmation(order_id):
     if 'user_id' not in session:
@@ -939,7 +1152,6 @@ def order_confirmation(order_id):
         return redirect(url_for('home'))
 
     return render_template('order_confirmation.html', order=order)
-
 
 
 # Add this new route to your Flask application
@@ -997,6 +1209,153 @@ def update_quantity(order_item_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/profile')
+def profile():
+    if 'user_id' not in session:
+        flash('Please login to view your profile.', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get_or_404(session['user_id'])
+    return render_template('profile.html', user=user)
+
+
+@app.route('/edit_profile', methods=['GET', 'POST'])
+def edit_profile():
+    if 'user_id' not in session:
+        flash('Please login to edit your profile.', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get_or_404(session['user_id'])
+    form = EditProfileForm(obj=user)
+
+    if form.validate_on_submit():
+        user.name = form.name.data
+        user.phone_number = form.phone_number.data
+
+        try:
+            db.session.commit()
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('profile'))
+        except Exception as e:
+            db.session.rollback()
+            flash('Error updating profile.', 'danger')
+            print(f"Database error: {e}")
+
+    return render_template('edit_profile.html', form=form)
+
+
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if 'user_id' not in session:
+        flash('Please login to change your password.', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get_or_404(session['user_id'])
+    form = ChangePasswordForm()
+
+    if form.validate_on_submit():
+        if check_password_hash(user.password_hash, form.current_password.data):
+            if form.new_password.data == form.confirm_password.data:
+                user.password_hash = generate_password_hash(form.new_password.data)
+                try:
+                    db.session.commit()
+                    flash('Password changed successfully!', 'success')
+                    return redirect(url_for('profile'))
+                except Exception as e:
+                    db.session.rollback()
+                    flash('Error changing password.', 'danger')
+                    print(f"Database error: {e}")
+            else:
+                flash('New passwords do not match.', 'danger')
+        else:
+            flash('Current password is incorrect.', 'danger')
+
+    return render_template('change_password.html', form=form)
+
+
+# Add these new routes
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+
+    form = ForgotPasswordForm()
+    if form.validate_on_submit():
+        user = User.query.filter(func.lower(User.email) == form.email.data.lower()).first()
+        if user:
+            # Generate secure token
+            token = secrets.token_urlsafe(32)
+            user.reset_password_token = token
+            user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+
+            try:
+                db.session.commit()
+
+                # Send reset email
+                reset_url = url_for('reset_password', token=token, _external=True)
+                msg = Message(
+                    'Password Reset Request',
+                    sender=('LevisHub Store', 'lmnvault@gmail.com'),
+                    recipients=[user.email]
+                )
+
+                msg.body = f'''To reset your password, visit the following link:
+{reset_url}
+
+If you did not make this request, simply ignore this email and no changes will be made.
+
+This link will expire in 1 hour.
+'''
+                msg.html = render_template('email/reset_password.html',
+                                           user=user,
+                                           reset_url=reset_url)
+
+                mail.send(msg)
+                flash('If an account exists with that email, a password reset link has been sent.', 'info')
+                return redirect(url_for('login'))
+
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error sending reset email: {e}")
+                flash('Error sending reset email. Please try again.', 'danger')
+        else:
+            # Still show the same message even if user doesn't exist (security)
+            flash('If an account exists with that email, a password reset link has been sent.', 'info')
+            return redirect(url_for('login'))
+
+    return render_template('forgot_password.html', form=form)
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+
+    user = User.query.filter_by(reset_password_token=token).first()
+    if user is None or (user.reset_token_expiry and user.reset_token_expiry < datetime.utcnow()):
+        flash('Invalid or expired reset link.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        if form.password.data == form.confirm_password.data:
+            user.password_hash = generate_password_hash(form.password.data)
+            user.reset_password_token = None
+            user.reset_token_expiry = None
+
+            try:
+                db.session.commit()
+                flash('Your password has been reset! You can now log in.', 'success')
+                return redirect(url_for('login'))
+            except Exception as e:
+                db.session.rollback()
+                flash('Error resetting password. Please try again.', 'danger')
+                print(f"Database error: {e}")
+        else:
+            flash('Passwords do not match.', 'danger')
+
+    return render_template('reset_password.html', form=form)
 
 if __name__ == '__main__':
     with app.app_context():

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .profile-section {
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+        min-height: 100vh;
+        padding: 3rem 0;
+    }
+
+    .profile-avatar {
+        width: 128px;
+        height: 128px;
+        position: relative;
+        margin: 0 auto;
+    }
+
+    .profile-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 4px solid white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-avatar .avatar-upload {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: white;
+        border-radius: 50%;
+        padding: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .profile-avatar .avatar-upload:hover {
+        transform: scale(1.1);
+    }
+
+    .profile-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+
+    .profile-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .info-item {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        transition: background-color 0.2s;
+    }
+
+    .info-item:hover {
+        background-color: #f8fafc;
+    }
+
+    .quick-action {
+        transition: transform 0.2s;
+    }
+
+    .quick-action:hover {
+        transform: translateY(-2px);
+    }
+
+    .verification-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+    }
+
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+</style>
+
+<div class="profile-section">
+    <div class="container">
+        <!-- Profile Header -->
+        <div class="text-center mb-5">
+            <div class="profile-avatar mb-4">
+                <img src="https://thumbs.dreamstime.com/b/user-profile-d-icon-avatar-person-button-picture-portrait-symbol-vector-neutral-gender-silhouette-circle-photo-blank-272643248.jpg"
+                     alt="Profile Picture">
+                <button class="avatar-upload border-0">
+                    <i class="bi bi-camera"></i>
+                </button>
+            </div>
+            <h1 class="display-6 fw-bold mb-2">{{ user.name }}</h1>
+            <p class="text-muted">Member since {{ user.id|string }}</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Profile Information -->
+            <div class="col-lg-8">
+                <div class="profile-card p-4">
+                    <h2 class="h4 mb-4">
+                        <i class="bi bi-person-circle me-2 text-primary"></i>
+                        Profile Details
+                    </h2>
+
+                    <div class="info-item mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-sm-4">
+                                <span class="text-muted">
+                                    <i class="bi bi-envelope me-2"></i>
+                                    Email
+                                </span>
+                            </div>
+                            <div class="col-sm-8 d-flex align-items-center gap-2">
+                                <span class="fw-medium">{{ user.email }}</span>
+                                {% if not user.email_verified %}
+                                <span class="verification-badge bg-warning text-dark">
+                                    Not verified
+                                    <a href="{{ url_for('resend_verification') }}"
+                                       class="ms-2 text-primary text-decoration-none fw-medium">
+                                        Verify now
+                                    </a>
+                                </span>
+                                {% else %}
+                                <span class="verification-badge bg-success text-white">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    Verified
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-item mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-sm-4">
+                                <span class="text-muted">
+                                    <i class="bi bi-telephone me-2"></i>
+                                    Phone
+                                </span>
+                            </div>
+                            <div class="col-sm-8">
+                                <span class="fw-medium">{{ user.phone_number }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-item">
+                        <div class="row align-items-center">
+                            <div class="col-sm-4">
+                                <span class="text-muted">
+                                    <i class="bi bi-person-badge me-2"></i>
+                                    Account Type
+                                </span>
+                            </div>
+                            <div class="col-sm-8">
+                                <span class="fw-medium">{{ user.role.name.title() }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Sidebar -->
+            <div class="col-lg-4">
+                <div class="profile-card p-4 mb-4">
+                    <h2 class="h5 mb-4">
+                        <i class="bi bi-grid me-2 text-primary"></i>
+                        Quick Actions
+                    </h2>
+
+                    <div class="d-flex flex-column gap-3">
+                        <a href="{{ url_for('my_orders') }}"
+                           class="quick-action text-decoration-none p-3 rounded bg-light">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-primary bg-opacity-10 text-primary p-2 rounded">
+                                    <i class="bi bi-bag"></i>
+                                </div>
+                                <div>
+                                    <h3 class="h6 mb-1 text-dark">My Orders</h3>
+                                    <p class="small text-muted mb-0">View your order history</p>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a href="{{ url_for('edit_profile') }}"
+                           class="quick-action text-decoration-none p-3 rounded bg-light">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-primary bg-opacity-10 text-primary p-2 rounded">
+                                    <i class="bi bi-gear"></i>
+                                </div>
+                                <div>
+                                    <h3 class="h6 mb-1 text-dark">Edit Profile</h3>
+                                    <p class="small text-muted mb-0">Update your information</p>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a href="{{ url_for('change_password') }}"
+                           class="quick-action text-decoration-none p-3 rounded bg-light">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-primary bg-opacity-10 text-primary p-2 rounded">
+                                    <i class="bi bi-lock"></i>
+                                </div>
+                                <div>
+                                    <h3 class="h6 mb-1 text-dark">Change Password</h3>
+                                    <p class="small text-muted mb-0">Update your password</p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Sign Out Button -->
+                <div class="profile-card p-4">
+                    <a href="{{ url_for('logout') }}"
+                       class="btn btn-danger w-100 btn-icon">
+                        <i class="bi bi-box-arrow-right"></i>
+                        Sign Out
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

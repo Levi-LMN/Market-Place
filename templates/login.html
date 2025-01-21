@@ -4,10 +4,10 @@
 
 {% block content %}
 <div class="checkout-container">
-    <div class="page-header">
-        <h1>Welcome Back</h1>
-        <p class="subtitle">Login to your account</p>
-    </div>
+<!--    <div class="page-header">-->
+<!--        <h1>Welcome Back</h1>-->
+<!--        <p class="subtitle">Login to your account</p>-->
+<!--    </div>-->
 
     <div class="auth-container">
         <div class="card auth-card">
@@ -42,7 +42,11 @@
                                 </svg>
                             </button>
                         </div>
+                        <div class="forgot-password">
+                            <a href="{{ url_for('forgot_password') }}" class="auth-link">Forgot Password?</a>
+                        </div>
                     </div>
+
 
                     <button type="submit" class="auth-button">
                         <span class="button-content">
@@ -73,17 +77,17 @@
     font-family: system-ui, -apple-system, sans-serif;
 }
 
-.page-header {
-    text-align: center;
-    margin-bottom: 3rem;
-}
+/*.page-header {*/
+/*    text-align: center;*/
+/*    margin-bottom: 3rem;*/
+/*}*/
 
-.page-header h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 0.5rem 0;
-}
+/*.page-header h1 {*/
+/*    font-size: 2.5rem;*/
+/*    font-weight: 700;*/
+/*    color: #0f172a;*/
+/*    margin: 0 0 0.5rem 0;*/
+/*}*/
 
 .subtitle {
     color: #64748b;
@@ -261,9 +265,9 @@
         padding: 2rem 1rem;
     }
 
-    .page-header h1 {
-        font-size: 2rem;
-    }
+    /*.page-header h1 {*/
+    /*    font-size: 2rem;*/
+    /*}*/
 
     .card {
         border-radius: 1rem;
@@ -274,6 +278,21 @@
         padding: 1.5rem;
     }
 }
+.forgot-password {
+    margin-top: 0.5rem;
+    text-align: right;
+}
+
+.forgot-password .auth-link {
+    font-size: 0.875rem;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.forgot-password .auth-link:hover {
+    text-decoration: underline;
+}
+
 </style>
 
 <script>
