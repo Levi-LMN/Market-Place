@@ -1360,9 +1360,8 @@ def google_callback():
                 name=users_name,
                 email=users_email,
                 password_hash=generate_password_hash(unique_id),  # Use Google ID as password
-                phone_number="",  # You might want to collect this later
-                role_id=user_role.id,
-                email_verified=True  # Google already verified the email
+                phone_number="Not provided",  # Default value for phone number
+                role_id=user_role.id
             )
             db.session.add(user)
             db.session.commit()
@@ -1377,7 +1376,6 @@ def google_callback():
     else:
         flash('Google authentication failed.', 'danger')
         return redirect(url_for('login'))
-
 
 if __name__ == '__main__':
     with app.app_context():
