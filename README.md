@@ -30,7 +30,7 @@ LevisStore is a comprehensive e-commerce platform built with Flask, allowing sto
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/levishub.git
+   git clone https://github.com/Levi-LMN/Market-Place.git
    cd levishub
    ```
 
